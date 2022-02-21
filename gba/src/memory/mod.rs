@@ -220,6 +220,12 @@ impl GbaMemory {
     }
 }
 
+impl Default for GbaMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Destructuring assignment until it is stabilized >:(
 macro_rules! de_assign {
     ($a:ident, $b:ident, $ex:expr) => {{

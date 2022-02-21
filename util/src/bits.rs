@@ -2,6 +2,7 @@ pub trait Bits {
     fn bits(self, start: u32, end: u32) -> Self;
     fn bits_from(self, start: u32) -> Self;
     fn bit(self, offset: u32) -> Self;
+    #[allow(clippy::wrong_self_convention)]
     fn is_bit_set(self, offset: u32) -> bool;
     fn replace_bits(self, start: u32, end: u32, value: Self) -> Self;
     fn replace_bit(self, offset: u32, value: Self) -> Self;

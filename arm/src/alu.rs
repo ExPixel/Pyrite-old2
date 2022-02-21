@@ -412,6 +412,7 @@ pub fn arm_alu_llr_s(cpu: &mut Cpu, lhs: u32, rhs: u32) -> u32 {
     }
     // LSL by 32 has result zero, carry out equal to bit 0 of Rm.
     // LSL by more than 32 has result zero, carry out zero.
+    #[allow(clippy::comparison_chain)]
     if rhs == 32 {
         cpu.registers.putfi_c(lhs & 1);
         0
@@ -447,6 +448,7 @@ pub fn arm_alu_lrr_s(cpu: &mut Cpu, lhs: u32, rhs: u32) -> u32 {
         return lhs;
     }
     // LSR by 32 has result zero, carry out equal to bit 31 of Rm.
+    #[allow(clippy::comparison_chain)]
     if rhs == 32 {
         cpu.registers.putfi_c(lhs & 0x80000000);
         0

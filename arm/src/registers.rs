@@ -67,12 +67,12 @@ impl CpuMode {
         }
     }
 
-    pub fn from_bits_checked(mode_bits: u32) -> Result<CpuMode, ()> {
+    pub fn from_bits_checked(mode_bits: u32) -> Result<CpuMode, InvalidModeBits> {
         let mode = Self::from_bits(mode_bits);
         if mode != CpuMode::Invalid {
             return Ok(mode);
         }
-        Err(())
+        Err(InvalidModeBits)
     }
 
     #[inline(always)]
@@ -544,6 +544,8 @@ impl Registers {
         }
     }
 }
+
+pub struct InvalidModeBits;
 
 #[cfg(test)]
 mod tests {

@@ -22,9 +22,9 @@ pub fn test_mov() {
         movs    r0, r1, lsr #32
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), true);
-    assert_eq!(cpu.registers.getf_n(), false);
-    assert_eq!(cpu.registers.getf_z(), true);
+    assert!(cpu.registers.getf_c());
+    assert!(!cpu.registers.getf_n());
+    assert!(cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(0), 0);
 }
 
@@ -41,7 +41,7 @@ pub fn test_asr() {
         movs    r3, r4, asr r2
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), true);
+    assert!(cpu.registers.getf_c());
     assert_eq!(cpu.registers.read(3), 1);
 
     // ASR by register with a value of 33
@@ -53,7 +53,7 @@ pub fn test_asr() {
         movs    r2, r2, asr r3
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), true);
+    assert!(cpu.registers.getf_c());
     assert_eq!(cpu.registers.read(2), 0xFFFFFFFF);
 }
 
@@ -86,9 +86,9 @@ pub fn test_orr() {
         orrs    r3, r3, r2, rrx
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), false);
-    assert_eq!(cpu.registers.getf_n(), true);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(!cpu.registers.getf_c());
+    assert!(cpu.registers.getf_n());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(3), 0x80000003);
 }
 
@@ -104,9 +104,9 @@ pub fn test_rsc() {
         rscs    r3, r2, r3
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), true);
-    assert_eq!(cpu.registers.getf_n(), false);
-    assert_eq!(cpu.registers.getf_z(), true);
+    assert!(cpu.registers.getf_c());
+    assert!(!cpu.registers.getf_n());
+    assert!(cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(2), 2);
 }
 
@@ -122,9 +122,9 @@ pub fn test_sbc() {
         sbcs    r2, r2, r2
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
-    assert_eq!(exec.cpu.registers.getf_n(), false);
-    assert_eq!(exec.cpu.registers.getf_z(), true);
+    assert!(exec.cpu.registers.getf_c());
+    assert!(!exec.cpu.registers.getf_n());
+    assert!(exec.cpu.registers.getf_z());
 
     exec.push(
         "
@@ -132,9 +132,9 @@ pub fn test_sbc() {
         sbcs    r2, r2, #0
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_z(), false);
-    assert_eq!(exec.cpu.registers.getf_c(), false);
-    assert_eq!(exec.cpu.registers.getf_n(), true);
+    assert!(!exec.cpu.registers.getf_z());
+    assert!(!exec.cpu.registers.getf_c());
+    assert!(exec.cpu.registers.getf_n());
 }
 
 #[test]
@@ -149,18 +149,18 @@ pub fn test_adc() {
         adcs    r2, r2, r3
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), false);
-    assert_eq!(exec.cpu.registers.getf_n(), true);
-    assert_eq!(exec.cpu.registers.getf_v(), false);
-    assert_eq!(exec.cpu.registers.getf_z(), false);
+    assert!(!exec.cpu.registers.getf_c());
+    assert!(exec.cpu.registers.getf_n());
+    assert!(!exec.cpu.registers.getf_v());
+    assert!(!exec.cpu.registers.getf_z());
 
     exec.push(
         "
         adcs    r2, r2, r2
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
-    assert_eq!(exec.cpu.registers.getf_n(), false);
+    assert!(exec.cpu.registers.getf_c());
+    assert!(!exec.cpu.registers.getf_n());
 
     exec.push(
         "
@@ -193,19 +193,19 @@ pub fn test_add() {
         adds    r2, r2, r3
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), false);
-    assert_eq!(exec.cpu.registers.getf_n(), true);
-    assert_eq!(exec.cpu.registers.getf_v(), false);
-    assert_eq!(exec.cpu.registers.getf_z(), false);
+    assert!(!exec.cpu.registers.getf_c());
+    assert!(exec.cpu.registers.getf_n());
+    assert!(!exec.cpu.registers.getf_v());
+    assert!(!exec.cpu.registers.getf_z());
 
     exec.push(
         "
         adds    r2, r2, r3	
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
-    assert_eq!(exec.cpu.registers.getf_n(), false);
-    assert_eq!(exec.cpu.registers.getf_v(), false);
+    assert!(exec.cpu.registers.getf_c());
+    assert!(!exec.cpu.registers.getf_n());
+    assert!(!exec.cpu.registers.getf_v());
 }
 
 #[test]
@@ -220,8 +220,8 @@ pub fn test_and() {
         ands    r2, r2, r3, lsr #1
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
-    assert_eq!(exec.cpu.registers.getf_z(), false);
+    assert!(exec.cpu.registers.getf_c());
+    assert!(!exec.cpu.registers.getf_z());
     assert_eq!(exec.cpu.registers.read(2), 2);
 
     exec.push(
@@ -232,9 +232,9 @@ pub fn test_and() {
         ands    r2, r2, r4, asr #32
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
-    assert_eq!(exec.cpu.registers.getf_n(), false);
-    assert_eq!(exec.cpu.registers.getf_z(), false);
+    assert!(exec.cpu.registers.getf_c());
+    assert!(!exec.cpu.registers.getf_n());
+    assert!(!exec.cpu.registers.getf_z());
     assert_eq!(exec.cpu.registers.read(2), exec.cpu.registers.read(3));
 }
 
@@ -250,9 +250,9 @@ pub fn test_bic() {
         bics    r2, r2, r3, asr #1
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), true);
-    assert_eq!(cpu.registers.getf_n(), false);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(cpu.registers.getf_c());
+    assert!(!cpu.registers.getf_n());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(2), 0x1FFFFFF9);
 }
 
@@ -268,9 +268,9 @@ pub fn test_eor() {
         eors    r2, r2, r3, lsl #0
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), true);
-    assert_eq!(cpu.registers.getf_n(), true);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(cpu.registers.getf_c());
+    assert!(cpu.registers.getf_n());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(2), 0x80000002);
 }
 
@@ -286,9 +286,9 @@ pub fn test_cmn() {
         cmn     r2, r3
         ",
     );
-    assert_eq!(cpu.registers.getf_c(), false);
-    assert_eq!(cpu.registers.getf_n(), true);
-    assert_eq!(cpu.registers.getf_v(), true);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(!cpu.registers.getf_c());
+    assert!(cpu.registers.getf_n());
+    assert!(cpu.registers.getf_v());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(2), 0x7FFFFFFF);
 }

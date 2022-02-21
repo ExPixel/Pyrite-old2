@@ -12,8 +12,8 @@ pub fn test_mla() {
         mlas    r2, r3, r2, r4
         ",
     );
-    assert_eq!(cpu.registers.getf_n(), false);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(!cpu.registers.getf_n());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(2), 8);
 }
 
@@ -29,8 +29,8 @@ pub fn test_mul() {
         muls    r2, r3, r2
         ",
     );
-    assert_eq!(cpu.registers.getf_n(), true);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(cpu.registers.getf_n());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(2), cpu.registers.read(4));
 }
 
@@ -45,8 +45,8 @@ pub fn test_umull() {
         umulls  r4, r5, r2, r3
         ",
     );
-    assert_eq!(cpu.registers.getf_n(), false);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(!cpu.registers.getf_n());
+    assert!(cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(5), 4);
 }
 
@@ -61,7 +61,7 @@ pub fn test_smull() {
         smulls  r4, r5, r2, r3
         ",
     );
-    assert_eq!(cpu.registers.getf_n(), true);
-    assert_eq!(cpu.registers.getf_z(), false);
+    assert!(cpu.registers.getf_n());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(5), 0xFFFFFFFC);
 }

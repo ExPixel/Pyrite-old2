@@ -30,10 +30,10 @@ pub fn test_msr() {
         msr     cpsr_flg, #0x90000000
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), false);
-    assert_eq!(exec.cpu.registers.getf_n(), true);
-    assert_eq!(exec.cpu.registers.getf_v(), true);
-    assert_eq!(exec.cpu.registers.getf_z(), false);
+    assert!(!exec.cpu.registers.getf_c());
+    assert!(exec.cpu.registers.getf_n());
+    assert!(exec.cpu.registers.getf_v());
+    assert!(!exec.cpu.registers.getf_z());
 
     exec.push(
         "

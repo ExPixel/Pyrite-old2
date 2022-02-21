@@ -226,7 +226,7 @@ pub fn test_ldr_preinc_reg() {
         ldr     r0, [r2, r3, rrx]
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
+    assert!(exec.cpu.registers.getf_c());
     assert_eq!(exec.cpu.registers.read(0), 0x80);
 }
 
@@ -307,7 +307,7 @@ pub fn test_ldr_predec_reg() {
         ldr     r0, [r2, -r3, rrx]
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
+    assert!(exec.cpu.registers.getf_c());
     assert_eq!(exec.cpu.registers.read(0), 0x80);
 }
 
@@ -398,7 +398,7 @@ pub fn test_ldr_preinc_reg_writeback() {
         ldr     r0, [r2, r3, rrx]!
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
+    assert!(exec.cpu.registers.getf_c());
     assert_eq!(exec.cpu.registers.read(0), 0x80);
     assert_eq!(exec.cpu.registers.read(2), exec.cpu.registers.read(5));
 }
@@ -661,7 +661,7 @@ pub fn test_ldr_postinc_reg() {
         ldr     r0, [r2], r3, rrx
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
+    assert!(exec.cpu.registers.getf_c());
     assert_eq!(exec.cpu.registers.read(0), 0x80);
     assert_eq!(exec.cpu.registers.read(2), exec.cpu.registers.read(4));
 }
@@ -750,7 +750,7 @@ pub fn test_ldr_postdec_reg() {
         ldr     r0, [r2], -r3, rrx
         ",
     );
-    assert_eq!(exec.cpu.registers.getf_c(), true);
+    assert!(exec.cpu.registers.getf_c());
     assert_eq!(exec.cpu.registers.read(0), 0x80);
     assert_eq!(exec.cpu.registers.read(2), exec.cpu.registers.read(4));
 }

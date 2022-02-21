@@ -74,6 +74,12 @@ impl Gba {
     }
 }
 
+impl Default for Gba {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait VideoOutput {
     /// Called when the GBA has a line ready to be output to the screen.
     /// At line 239 (240th line), a frame is ready to be output to the screen.

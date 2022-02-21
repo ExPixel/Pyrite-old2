@@ -8,15 +8,32 @@ fn devkit_arm() -> &'static Path {
     static DEVKIT_ARM: OnceCell<PathBuf> = OnceCell::new();
 
     DEVKIT_ARM.get_or_init(|| {
-        if let Ok(arm) = std::env::var("DEVKITARM") {
-            return PathBuf::from(arm);
+        let mut path = if let Ok(arm) = std::env::var("DEVKITARM") {
+            PathBuf::from(arm)
+        } else if let Ok(pro) = std::env::var("DEVKITPRO") {
+            PathBuf::from(pro).join("devkitARM")
+        } else {
+            panic!("DEVKITARM or DEVKITPRO environment variables must be defined")
+        };
+
+        // If the path doesn't exists on Windows then MSYS2 may have been used to install
+        // devkitPRO in which case use cygpath to find the Windows path.
+        if !path.exists() && cfg!(target_os = "windows") {
+            if let Ok(result) = Command::new("cygpath").arg("-w").arg(&path).output() {
+                let win_path = String::from_utf8_lossy(&result.stdout);
+                let win_path = win_path.trim();
+                if !win_path.trim().is_empty() {
+                    println!("using windows path from cygpath: {}", win_path);
+                    path = PathBuf::from(win_path);
+                }
+            }
         }
 
-        if let Ok(pro) = std::env::var("DEVKITPRO") {
-            return PathBuf::from(pro).join("devkitARM");
+        if !path.exists() {
+            panic!("DEVKITARM path {} does not exist", path.display());
         }
 
-        panic!("DEVKITARM or DEVKITPRO environment variables must be defined")
+        path
     })
 }
 

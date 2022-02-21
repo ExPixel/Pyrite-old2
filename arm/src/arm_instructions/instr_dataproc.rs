@@ -43,13 +43,13 @@ macro_rules! dataproc {
                 let res = $operation(cpu, lhs, rhs);
                 let spsr = cpu.registers.read_spsr();
                 cpu.registers.write_cpsr(spsr);
-                cycles = cycles + cpu.branch(res, memory);
+                cycles += cpu.branch(res, memory);
             } else {
                 let rhs = $get_operand(cpu, instr);
                 let res = $operation(cpu, lhs, rhs);
 
                 if util::unlikely!(rd == 15) {
-                    cycles = cycles + cpu.branch_arm(res, memory);
+                    cycles += cpu.branch_arm(res, memory);
                 } else {
                     cpu.registers.write(rd, res);
                 }

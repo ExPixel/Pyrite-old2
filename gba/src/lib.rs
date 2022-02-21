@@ -23,7 +23,7 @@ impl Gba {
             mem: GbaMemory::new(),
             cpu: Cpu::uninitialized(arm::Isa::Arm, arm::CpuMode::System),
             video: GbaVideo::new(scheduler.clone()),
-            scheduler: scheduler,
+            scheduler,
         }
     }
 

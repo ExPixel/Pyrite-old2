@@ -66,7 +66,7 @@ fn ldrh(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles {
     // unpredictable (depends on memory hardware).
     let (value, wait) = memory.load16(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as u32);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
@@ -75,14 +75,14 @@ fn ldrsh(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles {
     // unpredictable (depends on memory hardware).
     let (value, wait) = memory.load16(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as i16 as i32 as u32);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
 fn ldrsb(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles {
     let (value, wait) = memory.load8(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as i8 as i32 as u32);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
@@ -96,18 +96,18 @@ fn strh(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles {
     }
 
     let wait = memory.store16(addr, value as u16, AccessType::NonSeq);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 fn off_imm(_cpu: &Cpu, instr: u32) -> u32 {
     let lo = instr.bits(0, 3);
     let hi = instr.bits(8, 11);
-    return lo | (hi << 4);
+    lo | (hi << 4)
 }
 
 fn off_reg(cpu: &Cpu, instr: u32) -> u32 {
     let rm = instr.bits(0, 3);
-    return cpu.registers.read(rm);
+    cpu.registers.read(rm)
 }
 
 // Load halfword, Negative immediate offset

@@ -163,7 +163,7 @@ impl PathOrString for &'_ str {
 
 impl PathOrString for &String {
     fn convert_to_str(&self) -> &str {
-        &*self
+        *self
     }
 }
 
@@ -269,7 +269,7 @@ pub fn assemble(isa: Isa, name: &str, source: &str) -> std::io::Result<Vec<u8>> 
         panic!("failed to disassemble binary {}", bin_file_path.display())
     }
 
-    Ok(std::fs::read(&bin_file_path)?)
+    std::fs::read(&bin_file_path)
 }
 
 struct FileDestructor<'p> {

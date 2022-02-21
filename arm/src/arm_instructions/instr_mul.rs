@@ -32,7 +32,7 @@ pub fn arm_mla(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = Cycles::ONE + internal_multiply_cycles(rhs, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Multiply and accumulate registers, setting flags
@@ -48,7 +48,7 @@ pub fn arm_mlas(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = Cycles::ONE + internal_multiply_cycles(rhs, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Multiply registers
@@ -62,7 +62,7 @@ pub fn arm_mul(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = internal_multiply_cycles(rhs, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Multiply registers, setting flags
@@ -77,7 +77,7 @@ pub fn arm_muls(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = internal_multiply_cycles(rhs, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Signed long multiply and accumulate
@@ -98,7 +98,7 @@ pub fn arm_smlal(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = Cycles::ONE + internal_multiply_cycles(rsv, true);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Signed long multiply and accumulate, setting flags
@@ -120,7 +120,7 @@ pub fn arm_smlals(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles 
     let icycles = Cycles::ONE + internal_multiply_cycles(rsv, true);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Signed long multiply (32x32 to 64)
@@ -138,7 +138,7 @@ pub fn arm_smull(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = internal_multiply_cycles(rsv, true);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Signed long multiply, setting flags
@@ -157,7 +157,7 @@ pub fn arm_smulls(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles 
     let icycles = internal_multiply_cycles(rsv, true);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Unsigned long multiply and accumulate
@@ -178,7 +178,7 @@ pub fn arm_umlal(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = Cycles::ONE + internal_multiply_cycles(rsv, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Unsigned long multiply and accumulate, setting flags
@@ -200,7 +200,7 @@ pub fn arm_umlals(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles 
     let icycles = Cycles::ONE + internal_multiply_cycles(rsv, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Unsigned long multiply (32x32 to 64)
@@ -218,7 +218,7 @@ pub fn arm_umull(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
     let icycles = internal_multiply_cycles(rsv, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }
 
 /// Unsigned long multiply, setting flags
@@ -237,5 +237,5 @@ pub fn arm_umulls(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles 
     let icycles = internal_multiply_cycles(rsv, false);
     memory.stall(icycles);
 
-    return icycles;
+    icycles
 }

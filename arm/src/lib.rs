@@ -108,12 +108,12 @@ impl Cpu {
 
         let cycles = Cycles::ONE + fetch_wait;
 
-        let cycles = if check_condition(exec_opcode >> 28, &self.registers) {
+        
+        if check_condition(exec_opcode >> 28, &self.registers) {
             cycles + exec_fn(self, memory, exec_opcode)
         } else {
             cycles
-        };
-        cycles
+        }
     }
 
     /// Returns the number of cycles required to step the CPU in the THUMB state.
@@ -185,14 +185,14 @@ impl Cpu {
         let opcode_row = opcode.bits(20, 27);
         let opcode_col = opcode.bits(4, 7);
         let opcode_idx = (opcode_row * 16) + opcode_col;
-        return arm_instructions::ARM_OPCODE_TABLE[opcode_idx as usize];
+        arm_instructions::ARM_OPCODE_TABLE[opcode_idx as usize]
     }
 
     fn decode_thumb_opcode(opcode: u32) -> InstrFunction {
         let opcode_row = opcode.bits(12, 15);
         let opcode_col = opcode.bits(8, 11);
         let opcode_idx = (opcode_row * 16) + opcode_col;
-        return thumb_instructions::THUMB_OPCODE_TABLE[opcode_idx as usize];
+        thumb_instructions::THUMB_OPCODE_TABLE[opcode_idx as usize]
     }
 
     /// Sets the exception handler that will be called whenever the CPU encounters an
@@ -264,7 +264,7 @@ impl Cpu {
             self.registers.putf_f(f); // FIQ disable (done by RESET and FIQ only)
         }
 
-        return self.branch_arm(exception_vector, memory); // PC = exception_vector
+        self.branch_arm(exception_vector, memory) // PC = exception_vector
     }
 }
 

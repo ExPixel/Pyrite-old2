@@ -682,13 +682,13 @@ pub mod bs {
     pub fn imm(_cpu: &mut Cpu, instr: u32) -> u32 {
         let imm = instr.bits(0, 7);
         let rot = instr.bits(8, 11);
-        return imm.arm_ror(rot * 2);
+        imm.arm_ror(rot * 2)
     }
 
     /// Rotate right by immediate
     pub fn imm_nc(instr: u32) -> u32 {
         let imm = instr.bits(0, 7);
         let rot = instr.bits(8, 11);
-        return imm.arm_ror(rot * 2);
+        imm.arm_ror(rot * 2)
     }
 }

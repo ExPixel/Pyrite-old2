@@ -18,7 +18,7 @@ fn sdt_ldr(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles
 
     cpu.registers.write(rd, value);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
@@ -34,7 +34,7 @@ fn sdt_str(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles
 
     let wait = memory.store32(addr & 0xFFFFFFFC, value, AccessType::NonSeq);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 macro_rules! impl_move_shifted_register {
@@ -72,7 +72,7 @@ pub fn thumb_add_reg(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cy
 
     cpu.registers.write(rd, res);
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 /// Subtract contents of Rn from contents of Rs. Place result in Rd.
@@ -87,7 +87,7 @@ pub fn thumb_sub_reg(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cy
 
     cpu.registers.write(rd, res);
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 /// Add 3-bit immediate value to contents of Rs. Place result in Rd.
@@ -101,7 +101,7 @@ pub fn thumb_add_imm3(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> C
 
     cpu.registers.write(rd, res);
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 /// Subtract 3-bit immediate value from contents of Rs. Place result in Rd.
@@ -115,7 +115,7 @@ pub fn thumb_sub_imm3(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> C
 
     cpu.registers.write(rd, res);
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 macro_rules! mov_compare_add_subtract_imm {
@@ -208,7 +208,7 @@ pub fn thumb_dp_g1(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cycl
         _ => unreachable!(),
     }
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 pub fn thumb_dp_g2(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -240,7 +240,7 @@ pub fn thumb_dp_g2(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cycl
         _ => unreachable!(),
     }
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 pub fn thumb_dp_g3(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -267,7 +267,7 @@ pub fn thumb_dp_g3(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cycl
         _ => unreachable!(),
     }
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 pub fn thumb_dp_g4(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -304,7 +304,7 @@ pub fn thumb_dp_g4(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycle
         _ => unreachable!(),
     }
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_addh(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -326,7 +326,7 @@ pub fn thumb_addh(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles
         cycles += cpu.branch_thumb(dest, memory);
     }
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_cmph(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -357,7 +357,7 @@ pub fn thumb_movh(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles
         cycles += cpu.branch_thumb(dest, memory);
     }
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_bx_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -376,7 +376,7 @@ pub fn thumb_bx_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycl
         cycles += cpu.branch_thumb(dest, memory);
     }
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_b(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -404,7 +404,7 @@ fn thumb_ldr_pc(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, rd: u32) ->
     let (data, wait) = memory.load32(addr, AccessType::NonSeq);
     cpu.registers.write(rd, data);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_ldr_pc_r0(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -441,7 +441,7 @@ pub fn thumb_str_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cyc
     let offset = cpu.registers.read(ro);
     let addr = base.wrapping_add(offset);
 
-    return sdt_str(cpu, memory, rd, addr);
+    sdt_str(cpu, memory, rd, addr)
 }
 
 pub fn thumb_ldr_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -453,7 +453,7 @@ pub fn thumb_ldr_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cyc
     let offset = cpu.registers.read(ro);
     let addr = base.wrapping_add(offset);
 
-    return sdt_ldr(cpu, memory, rd, addr);
+    sdt_ldr(cpu, memory, rd, addr)
 }
 
 pub fn thumb_strb_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -468,7 +468,7 @@ pub fn thumb_strb_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cy
     let value = cpu.registers.read(rd);
     let wait = memory.store8(addr, (value & 0xFF) as u8, AccessType::NonSeq);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_ldrb_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -483,7 +483,7 @@ pub fn thumb_ldrb_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cy
     let (value, wait) = memory.load8(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as u32);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_strh_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -498,7 +498,7 @@ pub fn thumb_strh_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cy
     let value = cpu.registers.read(rd) & 0xFFFF;
     let wait = memory.store16(addr, value as u16, AccessType::NonSeq);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_ldrsb_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -513,7 +513,7 @@ pub fn thumb_ldrsb_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> C
     let (value, wait) = memory.load8(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as i8 as i32 as u32);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_ldrh_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -528,7 +528,7 @@ pub fn thumb_ldrh_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cy
     let (value, wait) = memory.load16(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as u32);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_ldrsh_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -543,7 +543,7 @@ pub fn thumb_ldrsh_reg(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> C
     let (value, wait) = memory.load16(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as i16 as i32 as u32);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[inline]
@@ -555,7 +555,7 @@ pub fn thumb_str_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cy
     let offset = opcode.bits(6, 10) << 2;
     let addr = base.wrapping_add(offset);
 
-    return sdt_str(cpu, memory, rd, addr);
+    sdt_str(cpu, memory, rd, addr)
 }
 
 pub fn thumb_ldr_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -566,7 +566,7 @@ pub fn thumb_ldr_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cy
     let offset = opcode.bits(6, 10) << 2;
     let addr = base.wrapping_add(offset);
 
-    return sdt_ldr(cpu, memory, rd, addr);
+    sdt_ldr(cpu, memory, rd, addr)
 }
 
 pub fn thumb_strb_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -580,7 +580,7 @@ pub fn thumb_strb_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> C
     let value = cpu.registers.read(rd);
     let wait = memory.store8(addr, (value & 0xFF) as u8, AccessType::NonSeq);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_ldrb_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -594,7 +594,7 @@ pub fn thumb_ldrb_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> C
     let (value, wait) = memory.load8(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as u32);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_strh_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -608,7 +608,7 @@ pub fn thumb_strh_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> C
     let value = cpu.registers.read(rd) & 0xFFFF;
     let wait = memory.store16(addr, value as u16, AccessType::NonSeq);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 pub fn thumb_ldrh_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -622,7 +622,7 @@ pub fn thumb_ldrh_imm5(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> C
     let (value, wait) = memory.load16(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as u32);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[inline(always)]
@@ -630,7 +630,7 @@ fn thumb_strsp(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, rd: u32) -> 
     let offset = opcode.bits(0, 7) << 2;
     let addr = cpu.registers.read(13).wrapping_add(offset);
 
-    return sdt_str(cpu, memory, rd, addr);
+    sdt_str(cpu, memory, rd, addr)
 }
 
 pub fn thumb_strsp_r0(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -663,7 +663,7 @@ fn thumb_ldrsp(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, rd: u32) -> 
     let offset = opcode.bits(0, 7) << 2;
     let addr = cpu.registers.read(13).wrapping_add(offset);
 
-    return sdt_ldr(cpu, memory, rd, addr);
+    sdt_ldr(cpu, memory, rd, addr)
 }
 
 pub fn thumb_ldrsp_r0(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -701,7 +701,7 @@ fn thumb_addpc(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32, rd: u32) ->
     let pc = cpu.registers.read(15) & 0xFFFFFFFD;
     cpu.registers.write(rd, pc.wrapping_add(offset));
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 #[inline(always)]
@@ -710,7 +710,7 @@ fn thumb_addsp(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32, rd: u32) ->
     let sp = cpu.registers.read(13);
     cpu.registers.write(rd, sp.wrapping_add(offset));
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 pub fn thumb_addpc_r0(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -771,7 +771,7 @@ pub fn thumb_addsp_imm7(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) ->
     let sp = cpu.registers.read(13);
     cpu.registers.write(13, sp.wrapping_add(offset));
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 pub fn thumb_push(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -804,7 +804,7 @@ pub fn thumb_push(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles
         }
     }
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_push_lr(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -843,7 +843,7 @@ pub fn thumb_push_lr(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cyc
     let wait = memory.store32(addr, value, access_type);
     cycles += Cycles::ONE + wait;
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_pop(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -886,7 +886,7 @@ pub fn thumb_pop(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles 
     cycles += Cycles::ONE;
     memory.stall(Cycles::ONE);
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_pop_pc(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -935,7 +935,7 @@ pub fn thumb_pop_pc(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycl
     let dest = value & 0xFFFFFFFE;
     cycles += cpu.branch_thumb(dest, memory) + wait;
 
-    return cycles;
+    cycles
 }
 
 fn thumb_stmia(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, rb: u32) -> Cycles {
@@ -969,7 +969,7 @@ fn thumb_stmia(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, rb: u32) -> 
         }
     }
 
-    return cycles;
+    cycles
 }
 
 fn thumb_ldmia(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, rb: u32) -> Cycles {
@@ -1010,7 +1010,7 @@ fn thumb_ldmia(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, rb: u32) -> 
     cycles += Cycles::ONE;
     memory.stall(Cycles::ONE);
 
-    return cycles;
+    cycles
 }
 
 pub fn thumb_stmia_r0(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -1072,9 +1072,9 @@ fn thumb_b_cond(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32, cond: u32) 
         let offset = ((opcode & 0xFF) << 1).sign_extend(9);
         let pc = cpu.registers.read(15);
         let dest = pc.wrapping_add(offset) & 0xFFFFFFFE;
-        return cpu.branch_thumb(dest, memory);
+        cpu.branch_thumb(dest, memory)
     } else {
-        return Cycles::ZERO;
+        Cycles::ZERO
     }
 }
 
@@ -1127,7 +1127,7 @@ pub fn thumb_bl_setup(cpu: &mut Cpu, _memory: &mut dyn Memory, opcode: u32) -> C
     let setup = pc.wrapping_add(off);
     cpu.registers.write(14, setup);
 
-    return Cycles::ZERO;
+    Cycles::ZERO
 }
 
 pub fn thumb_bl_off(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycles {
@@ -1136,7 +1136,7 @@ pub fn thumb_bl_off(cpu: &mut Cpu, memory: &mut dyn Memory, opcode: u32) -> Cycl
     let off = (opcode & 0x7FF) << 1;
     let dest = lr.wrapping_add(off) & 0xFFFFFFFE;
     cpu.registers.write(14, (pc.wrapping_sub(2)) | 1);
-    return cpu.branch_thumb(dest, memory);
+    cpu.branch_thumb(dest, memory)
 }
 
 pub fn thumb_swi(cpu: &mut Cpu, memory: &mut dyn Memory, _opcode: u32) -> Cycles {

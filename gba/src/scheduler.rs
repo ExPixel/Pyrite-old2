@@ -13,7 +13,7 @@ pub struct Scheduler {
 
 impl Scheduler {
     #[inline(always)]
-    pub fn schedule(&mut self, mut new_event: Event) {
+    pub fn schedule(&mut self, new_event: Event) {
         self.inner.borrow_mut().schedule(new_event);
     }
 

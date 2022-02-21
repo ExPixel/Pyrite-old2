@@ -142,7 +142,7 @@ fn store_word(
     }
 
     let wait = memory.store32(addr, value, access_type);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
@@ -156,7 +156,7 @@ fn load_word(
 ) -> Cycles {
     let (value, wait) = memory.load32(addr, access_type);
     cpu.registers.write(reg, value);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 // Load multiple words, decrement after

@@ -107,7 +107,7 @@ fn sdt_ldr(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles
 
     cpu.registers.write(rd, value);
 
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
@@ -115,7 +115,7 @@ fn sdt_ldr(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles
 fn sdt_ldrb(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles {
     let (value, wait) = memory.load8(addr, AccessType::NonSeq);
     cpu.registers.write(rd, value as u32);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
@@ -130,7 +130,7 @@ fn sdt_str(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycles
     }
 
     let wait = memory.store32(addr & !0x3, value, AccessType::NonSeq);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[must_use]
@@ -145,7 +145,7 @@ fn sdt_strb(cpu: &mut Cpu, memory: &mut dyn Memory, rd: u32, addr: u32) -> Cycle
     }
 
     let wait = memory.store8(addr, value as u8, AccessType::NonSeq);
-    return Cycles::ONE + wait;
+    Cycles::ONE + wait
 }
 
 #[inline(always)]

@@ -4,27 +4,27 @@ use util::bits::Bits as _;
 use super::GbaMemory;
 
 impl GbaMemory {
-    pub(super) fn load32_io(&mut self, address: u32) -> u32 {
+    pub(super) fn load32_io(&mut self, _address: u32) -> u32 {
         todo!("load32_io")
     }
 
-    pub(super) fn load16_io(&mut self, address: u32) -> u16 {
+    pub(super) fn load16_io(&mut self, _address: u32) -> u16 {
         todo!("load16_io")
     }
 
-    pub(super) fn load8_io(&mut self, address: u32) -> u8 {
+    pub(super) fn load8_io(&mut self, _address: u32) -> u8 {
         todo!("load8_io")
     }
 
-    pub(super) fn store32_io(&mut self, address: u32, value: u32) {
+    pub(super) fn store32_io(&mut self, _address: u32, _value: u32) {
         todo!("store32_io")
     }
 
-    pub(super) fn store16_io(&mut self, address: u32, value: u16) {
+    pub(super) fn store16_io(&mut self, _address: u32, _value: u16) {
         todo!("store16_io")
     }
 
-    pub(super) fn store8_io(&mut self, address: u32, value: u8) {
+    pub(super) fn store8_io(&mut self, _address: u32, _value: u8) {
         todo!("store8_io")
     }
 

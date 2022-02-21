@@ -1,0 +1,17 @@
+[package]
+name = "arm"
+version = "0.1.0"
+edition = "2018"
+
+[features]
+default = ["devkit-arm-tests"]
+devkit-arm-tests = []
+
+[dependencies]
+util = { path = "../util" }
+bitflags = "1"
+log = "0.4"
+
+[dev-dependencies]
+once_cell="1"
+byteorder="1"

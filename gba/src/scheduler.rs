@@ -13,8 +13,11 @@ pub struct Scheduler {
 
 impl Scheduler {
     #[inline(always)]
-    pub fn schedule(&mut self, new_event: Event) {
-        self.inner.borrow_mut().schedule(new_event);
+    pub fn schedule(&mut self, callback: EventFn, cycles: impl Into<Cycles>) {
+        self.inner.borrow_mut().schedule(Event {
+            callback,
+            cycles_remaining: cycles.into(),
+        });
     }
 
     #[inline(always)]
@@ -47,13 +50,20 @@ impl Inner {
         self.events.insert(insert_idx, new_event);
     }
 
-    fn has_next_event(&self, cycles: Cycles) -> bool {
-        if let Some(event) = self.events.front() {
-            event.cycles_remaining <= cycles
+    fn advance(&mut self, cycles: Cycles) -> Option<(EventFn, Cycles)> {
+        if let Some(event) = self.events.front_mut() {
+            if event.cycles_remaining > cycles {
+                event.cycles_remaining -= cycles;
+                return None;
+            }
         } else {
-            false
+            return None;
         }
+
+        let event = self.events.pop_front().unwrap();
+        Some((event.callback, cycles - event.cycles_remaining))
     }
+}
 
     fn advance(&mut self, cycles: Cycles) -> Option<(EventFn, Cycles)> {
         if self.has_next_event(cycles) {

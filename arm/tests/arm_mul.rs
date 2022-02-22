@@ -46,7 +46,7 @@ pub fn test_umull() {
         ",
     );
     assert!(!cpu.registers.getf_n());
-    assert!(cpu.registers.getf_z());
+    assert!(!cpu.registers.getf_z());
     assert_eq!(cpu.registers.read(5), 4);
 }
 

@@ -38,9 +38,9 @@ impl Inner {
     fn schedule(&mut self, mut new_event: Event) {
         let mut insert_idx = self.events.len();
         for (idx, event) in self.events.iter_mut().enumerate() {
-            if event.cycles_remaining > new_event.cycles_remaining {
+            if new_event.cycles_remaining < event.cycles_remaining {
                 event.cycles_remaining -= new_event.cycles_remaining;
-                insert_idx = idx + 1;
+                insert_idx = idx;
                 break;
             }
             new_event.cycles_remaining -= event.cycles_remaining;

@@ -37,40 +37,19 @@ impl Gba {
         self.mem.set_gamepak(cart);
     }
 
-    pub fn frame(&mut self, video: &mut dyn VideoOutput, _audio: &mut dyn AudioOutput) {
-        static mut VALUE: u16 = 0;
-        static mut ADD: bool = true;
+    pub fn frame(&mut self) {}
 
-        let value = unsafe { VALUE };
-        unsafe {
-            if ADD {
-                VALUE += 1;
-
-                if VALUE == 31 {
-                    ADD = false;
-                }
-            } else {
-                VALUE -= 1;
-
-                if VALUE == 0 {
-                    ADD = true;
-                }
-            }
-        };
-
-        let line_data = [(value << 10); 240];
-        for line_idx in 0..160 {
-            video.output_line(line_idx, &line_data);
-        }
-    }
-
-    pub fn step(&mut self, _video: &mut dyn VideoOutput, _audio: &mut dyn AudioOutput) {
+    pub fn step(&mut self) {
         let mut cycles = self.cpu.step(&mut self.mem);
 
         while let Some((event, next_cycles)) = self.scheduler.advance(cycles) {
             cycles = next_cycles;
             (event)(self, cycles);
         }
+    }
+
+    pub fn video(&self) -> &GbaVideo {
+        &self.video
     }
 }
 
@@ -79,14 +58,6 @@ impl Default for Gba {
         Self::new()
     }
 }
-
-pub trait VideoOutput {
-    /// Called when the GBA has a line ready to be output to the screen.
-    /// At line 239 (240th line), a frame is ready to be output to the screen.
-    fn output_line(&mut self, line: u32, pixels: &[u16; 240]);
-}
-
-pub trait AudioOutput {}
 
 // Send should be safe to implement for the GBA because we never leak the RC's
 // that are used by the GBA and its other parts.

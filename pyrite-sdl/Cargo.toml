@@ -1,0 +1,18 @@
+[package]
+name = "pyrite-sdl"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pyrite = { path = "../pyrite" }
+gba = { path = "../gba" }
+util = { path = "../util" }
+anyhow = "1"
+log = "0.4"
+pretty_env_logger = "0.4"
+
+[dependencies.sdl2]
+version = "0.34"
+features = ["ttf"]

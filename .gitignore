@@ -1,2 +1,5 @@
 target/
 Cargo.lock
+
+# Ignore DLL files in the root directory.
+/*.dll

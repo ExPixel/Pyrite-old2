@@ -12,7 +12,6 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    #[inline(always)]
     pub fn schedule(&mut self, callback: EventFn, cycles: impl Into<Cycles>) {
         self.inner.borrow_mut().schedule(Event {
             callback,
@@ -20,9 +19,8 @@ impl Scheduler {
         });
     }
 
-    #[inline(always)]
-    pub fn advance(&mut self, cycles: Cycles) -> Option<(EventFn, Cycles)> {
-        self.inner.borrow_mut().advance(cycles)
+    pub fn advance(&mut self, cycles: impl Into<Cycles>) -> Option<(EventFn, Cycles)> {
+        self.inner.borrow_mut().advance(cycles.into())
     }
 }
 

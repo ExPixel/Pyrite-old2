@@ -6,3 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+gba = { path = "../gba" }
+log = "0.4"
+
+[dependencies.crossbeam]
+version = "0.8.1"
+features = ["crossbeam-channel"]

@@ -6,7 +6,7 @@ pub use memory::GbaMemory;
 
 use arm::Cpu;
 use scheduler::Scheduler;
-use video::GbaVideo;
+pub use video::{GbaVideo, SCREEN_HEIGHT, SCREEN_PIXEL_COUNT, SCREEN_WIDTH};
 
 pub struct Gba {
     mem: GbaMemory,
@@ -37,7 +37,10 @@ impl Gba {
         self.mem.set_gamepak(cart);
     }
 
-    pub fn frame(&mut self) {}
+    pub fn frame(&mut self) {
+        let elem = self.video.buffer[0];
+        self.video.buffer.fill(elem.wrapping_add(1));
+    }
 
     pub fn step(&mut self) {
         let mut cycles = self.cpu.step(&mut self.mem);

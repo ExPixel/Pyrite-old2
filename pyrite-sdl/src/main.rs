@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use anyhow::{Context as _, Error};
 use sdl2::{
     event::Event,
@@ -50,6 +52,13 @@ fn run() -> anyhow::Result<()> {
         .with_lock(None, |buffer: &mut [u8], _: usize| buffer.fill(0))
         .map_err(Error::msg)
         .context("failed to update GBA frame texture")?;
+    let screen_buffer = Arc::new(Mutex::new([0u16; gba::SCREEN_PIXEL_COUNT]));
+
+    let gba = pyrite::GbaHandle::new();
+
+    gba.after_frame_wait(|_, state| {
+        state.paused = false;
+    });
 
     log::trace!("starting SDL loop...");
     canvas.set_draw_color(Color::RGB(255, 0, 255));
@@ -61,37 +70,33 @@ fn run() -> anyhow::Result<()> {
             }
         }
 
+        let screen = screen_buffer.clone();
+        gba.after_frame_wait(move |gba, _| {
+            let mut screen = screen.lock().expect("failed to lock screen buffer");
+            screen.copy_from_slice(gba.video().buffer());
+        });
+
+        let screen = screen_buffer.lock().expect("failed to lock screen buffer");
+        gba_frame_texture
+            .with_lock(None, |buffer: &mut [u8], pitch: usize| {
+                for y in 0..160 {
+                    for x in 0..240 {
+                        let offset_src = y * 240 + x;
+                        let offset_dst = y * pitch + x * 2;
+
+                        buffer[offset_dst] = screen[offset_src] as u8;
+                        buffer[offset_dst + 1] = (screen[offset_src] >> 8) as u8;
+                    }
+                }
+            })
+            .map_err(Error::msg)
+            .context("failed to update GBA frame texture")?;
+
         canvas.clear();
-
-        // if gba_has_frame.load(std::sync::atomic::Ordering::Acquire) {
-        //     pixel_buffer = pixel_buffer_swap.swap(pixel_buffer);
-
-        //     gba_frame_texture
-        //         .with_lock(None, |buffer: &mut [u8], pitch: usize| {
-        //             for y in 0..160 {
-        //                 for x in 0..240 {
-        //                     let offset_src = y * 240 + x;
-        //                     let offset_dst = y * pitch + x * 2;
-
-        //                     buffer[offset_dst] = pixel_buffer[offset_src] as u8;
-        //                     buffer[offset_dst + 1] = (pixel_buffer[offset_src] >> 8) as u8;
-        //                 }
-        //             }
-        //         })
-        //         .map_err(Error::msg)
-        //         .context("failed to update GBA frame texture")?;
-
-        //     canvas
-        //         .copy(&gba_frame_texture, None, None)
-        //         .map_err(Error::msg)
-        //         .context("failed to copy GBA frame texture to canvas")?;
-        // }
-
         canvas
             .copy(&gba_frame_texture, None, None)
             .map_err(Error::msg)
             .context("failed to copy GBA frame texture to canvas")?;
-
         canvas.present();
     }
 

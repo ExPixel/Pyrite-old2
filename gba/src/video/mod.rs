@@ -2,13 +2,13 @@ use arm::Cycles;
 
 use crate::{scheduler::Scheduler, Gba, GbaMemory};
 
-const SCREEN_WIDTH: usize = 240;
-const SCREEN_HEIGHT: usize = 160;
-const SCREEN_PIXEL_COUNT: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
+pub const SCREEN_WIDTH: usize = 240;
+pub const SCREEN_HEIGHT: usize = 160;
+pub const SCREEN_PIXEL_COUNT: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
 
 pub struct GbaVideo {
     scheduler: Scheduler,
-    buffer: [u16; SCREEN_PIXEL_COUNT],
+    pub(crate) buffer: [u16; SCREEN_PIXEL_COUNT],
 }
 
 impl GbaVideo {

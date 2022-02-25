@@ -1,10 +1,15 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use anyhow::{Context as _, Error};
 use sdl2::{
     event::Event,
     pixels::{Color, PixelFormatEnum},
 };
+
+const LOCK_FPS: bool = false;
 
 fn main() {
     if let Err(err) = run() {
@@ -19,6 +24,8 @@ fn run() -> anyhow::Result<()> {
         .parse_filters("trace")
         .try_init()
         .context("failed to initiaize logger")?;
+
+    let frame_delay_target = std::time::Duration::from_secs_f64(1.0 / 60.0);
 
     let sdl_context = sdl2::init()
         .map_err(Error::msg)
@@ -56,13 +63,20 @@ fn run() -> anyhow::Result<()> {
 
     let gba = pyrite::GbaHandle::new();
 
-    gba.after_frame_wait(|_, state| {
-        state.paused = false;
+    let screen = screen_buffer.clone();
+    gba.on_frame(move |gba, _| {
+        let mut screen = screen.lock().expect("failed to lock screen buffer");
+        screen.copy_from_slice(gba.video().buffer());
     });
+    gba.set_paused(false);
+
+    let mut fps_counter = FPSCounter::default();
 
     log::trace!("starting SDL loop...");
     canvas.set_draw_color(Color::RGB(255, 0, 255));
     'main_loop: loop {
+        let frame_start_time = Instant::now();
+
         for event in event_pump.poll_iter() {
             if let Event::Quit { .. } = event {
                 log::trace!("exiting SDL loop...");
@@ -70,15 +84,9 @@ fn run() -> anyhow::Result<()> {
             }
         }
 
-        let screen = screen_buffer.clone();
-        gba.after_frame_wait(move |gba, _| {
-            let mut screen = screen.lock().expect("failed to lock screen buffer");
-            screen.copy_from_slice(gba.video().buffer());
-        });
-
-        let screen = screen_buffer.lock().expect("failed to lock screen buffer");
         gba_frame_texture
             .with_lock(None, |buffer: &mut [u8], pitch: usize| {
+                let screen = screen_buffer.lock().expect("failed to lock screen buffer");
                 for y in 0..160 {
                     for x in 0..240 {
                         let offset_src = y * 240 + x;
@@ -98,9 +106,52 @@ fn run() -> anyhow::Result<()> {
             .map_err(Error::msg)
             .context("failed to copy GBA frame texture to canvas")?;
         canvas.present();
+
+        let frame_end_time = Instant::now();
+        let frame_duration = frame_end_time.duration_since(frame_start_time);
+        if frame_duration < frame_delay_target && LOCK_FPS {
+            let grace = std::time::Duration::from_millis(1);
+            std::thread::sleep((frame_delay_target - frame_duration).saturating_sub(grace));
+        }
+
+        if let Some(fps) = fps_counter.count(frame_end_time) {
+            let title = format!("Pyrite ({:.1} FPS)", fps);
+            canvas
+                .window_mut()
+                .set_title(&title)
+                .context("failed to set window title")?;
+        }
     }
 
     log::info!("exiting...");
 
     Ok(())
+}
+
+#[derive(Default)]
+struct FPSCounter {
+    start_time: Option<std::time::Instant>,
+    frames: u32,
+}
+
+impl FPSCounter {
+    pub fn count(&mut self, now: std::time::Instant) -> Option<f64> {
+        self.frames += 1;
+        if self.start_time.is_none() {
+            self.start_time = Some(now);
+            return None;
+        }
+
+        let elapsed = now.duration_since(self.start_time.unwrap());
+        if elapsed < std::time::Duration::from_secs(1) {
+            return None;
+        }
+        self.start_time = Some(now);
+
+        let seconds = elapsed.as_secs_f64();
+        let fps = self.frames as f64 / seconds;
+        self.frames = 0;
+
+        Some(fps)
+    }
 }

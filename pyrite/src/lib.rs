@@ -1,4 +1,7 @@
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    time::{Duration, Instant},
+};
 
 use crossbeam::{
     channel::{self, Receiver, Sender, TryRecvError},
@@ -6,30 +9,48 @@ use crossbeam::{
 };
 use gba::Gba;
 
+type GbaThreadCallback = Box<dyn 'static + Send + FnMut(&mut Gba, &mut GbaThreadState)>;
+
 fn gba_thread_fn(rx: Receiver<GbaMessage>) {
-    let mut gba = Gba::new();
-    let mut state = GbaThreadState::default();
+    let mut ctx = Context::default();
+    ctx.state.target_fps = 60.0;
 
     log::trace!("waiting for GBA start");
-    state.paused = true;
-    wait_for_gba_unpause(&mut gba, &mut state, &rx);
+    ctx.state.paused = true;
+    wait_for_gba_unpause(&mut ctx, &rx);
+
+    let spin_sleeper = spin_sleep::SpinSleeper::default();
 
     log::trace!("starting GBA thread loop");
-    while !state.stopped {
-        gba.frame();
-        empty_gba_message_queue(&mut gba, &mut state, &rx);
-        wait_for_gba_unpause(&mut gba, &mut state, &rx);
+    while !ctx.state.stopped {
+        let frame_start_time = Instant::now();
+
+        ctx.gba.frame();
+        ctx.on_frame
+            .iter_mut()
+            .for_each(|cb| (cb)(&mut ctx.gba, &mut ctx.state));
+        empty_gba_message_queue(&mut ctx, &rx);
+
+        if ctx.state.paused {
+            wait_for_gba_unpause(&mut ctx, &rx);
+        } else {
+            let frame_duration = frame_start_time.elapsed();
+            let target_frame_duration = Duration::from_secs_f64(1.0 / ctx.state.target_fps);
+            if frame_duration < target_frame_duration {
+                spin_sleeper.sleep(target_frame_duration - frame_duration);
+            }
+        }
     }
     log::trace!("exited GBA thread loop");
 }
 
-fn empty_gba_message_queue(gba: &mut Gba, state: &mut GbaThreadState, rx: &Receiver<GbaMessage>) {
+fn empty_gba_message_queue(ctx: &mut Context, rx: &Receiver<GbaMessage>) {
     loop {
         match rx.try_recv() {
-            Ok(msg) => process_gba_message(msg, gba, state),
+            Ok(msg) => process_gba_message(ctx, msg),
             Err(TryRecvError::Disconnected) => {
                 log::trace!("no more GBA handles, shutting down");
-                state.stop();
+                ctx.state.stop();
                 break;
             }
             Err(TryRecvError::Empty) => break,
@@ -37,35 +58,42 @@ fn empty_gba_message_queue(gba: &mut Gba, state: &mut GbaThreadState, rx: &Recei
     }
 }
 
-fn wait_for_gba_unpause(gba: &mut Gba, state: &mut GbaThreadState, rx: &Receiver<GbaMessage>) {
-    while state.paused && !state.stopped {
+fn wait_for_gba_unpause(ctx: &mut Context, rx: &Receiver<GbaMessage>) {
+    while ctx.state.paused && !ctx.state.stopped {
         match rx.recv() {
-            Ok(msg) => process_gba_message(msg, gba, state),
+            Ok(msg) => process_gba_message(ctx, msg),
             Err(_) => {
                 log::trace!("no more GBA handles, shutting down");
-                state.stop();
+                ctx.state.stop();
                 break;
             }
         }
     }
 }
 
-fn process_gba_message(msg: GbaMessage, gba: &mut Gba, state: &mut GbaThreadState) {
+fn process_gba_message(ctx: &mut Context, msg: GbaMessage) {
     match msg {
         GbaMessage::Shutdown => {
             log::trace!("GBA thread shutdown requested");
+            ctx.state.stopped = true;
         }
-
-        GbaMessage::CallbackImm(mut cb) => {
-            (cb)(gba, state);
-        }
+        GbaMessage::CallbackAfterFrame(mut cb) => (cb)(&mut ctx.gba, &mut ctx.state),
+        GbaMessage::CallbackOnFrame(cb) => ctx.on_frame.push(cb),
     }
+}
+
+#[derive(Default)]
+struct Context {
+    gba: Gba,
+    state: GbaThreadState,
+    on_frame: Vec<GbaThreadCallback>,
 }
 
 #[derive(Default)]
 pub struct GbaThreadState {
     pub paused: bool,
     stopped: bool,
+    pub target_fps: f64,
 }
 
 impl GbaThreadState {
@@ -92,12 +120,29 @@ impl GbaHandle {
         GbaHandle { tx, parker }
     }
 
+    pub fn on_frame<F>(&self, cb: F)
+    where
+        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
+    {
+        if self
+            .tx
+            .send(GbaMessage::CallbackOnFrame(Box::new(cb)))
+            .is_err()
+        {
+            log::warn!("called `on_frame` on disconnected GBA handle")
+        }
+    }
+
     pub fn after_frame<F>(&self, cb: F)
     where
         F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
     {
-        if self.tx.send(GbaMessage::CallbackImm(Box::new(cb))).is_err() {
-            log::warn!("called `with` on disconnected GBA handle")
+        if self
+            .tx
+            .send(GbaMessage::CallbackAfterFrame(Box::new(cb)))
+            .is_err()
+        {
+            log::warn!("called `after_frame` on disconnected GBA handle")
         }
     }
 
@@ -118,6 +163,10 @@ impl GbaHandle {
         });
 
         parker.park();
+    }
+
+    pub fn set_paused(&self, paused: bool) {
+        self.after_frame(move |_, state| state.paused = paused);
     }
 }
 
@@ -143,6 +192,7 @@ impl Default for GbaHandle {
 }
 
 enum GbaMessage {
-    CallbackImm(Box<dyn 'static + Send + FnMut(&mut Gba, &mut GbaThreadState)>),
+    CallbackAfterFrame(GbaThreadCallback),
+    CallbackOnFrame(GbaThreadCallback),
     Shutdown,
 }

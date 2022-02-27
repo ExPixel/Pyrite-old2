@@ -477,7 +477,7 @@ impl Memory for GbaMemory {
 
 /// Converts an address in the range [0x06000000, 0x06FFFFFF] into an offset in VRAM accounting
 /// for VRAM mirroring.
-pub const fn vram_offset(address: u32) -> usize {
+const fn vram_offset(address: u32) -> usize {
     // Even though VRAM is sized 96K (64K+32K), it is repeated in steps of 128K (64K+32K+32K,
     // the two 32K blocks itself being mirrors of each other).
     let vram128 = address % (128 * 1024); // offset in a 128KB block
@@ -488,5 +488,92 @@ pub const fn vram_offset(address: u32) -> usize {
         vram128 as usize - (32 * 1024)
     } else {
         vram128 as usize
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// Most internal memory regions are mirrored across their entire 24bit address spaces.
+    /// This includes `EWRAM` at `0x02XXXXXX`, `IWRAM` at `0x03XXXXXX`, `Palette RAM` at
+    /// `0x05XXXXXX`, and OAM at `0x07XXXXXX`. VRAM is mirrored as well but that test is handled
+    /// in [`gba_vram_memory_mirrors`].
+    #[test]
+    pub fn simple_gba_memory_mirrors() {
+        let mut memory = GbaMemory::new();
+
+        // EWRAM 256K mirrors:
+        assert_eq!(memory.load32(0x02000000, AccessType::Seq).0, 0);
+        memory.store32(0x02000000, 0xCACBCDCE, AccessType::Seq);
+        assert_eq!(memory.load8(0x02000001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load8(0x02040001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load16(0x02000002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load16(0x02040002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load32(0x02000000, AccessType::Seq).0, 0xCACBCDCE);
+        assert_eq!(memory.load32(0x02040000, AccessType::Seq).0, 0xCACBCDCE);
+
+        // IWRAM 32K mirrors:
+        assert_eq!(memory.load32(0x03000000, AccessType::Seq).0, 0);
+        memory.store32(0x03000000, 0xCACBCDCE, AccessType::Seq);
+        assert_eq!(memory.load8(0x03000001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load8(0x03008001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load16(0x03000002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load16(0x03008002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load32(0x03000000, AccessType::Seq).0, 0xCACBCDCE);
+        assert_eq!(memory.load32(0x03008000, AccessType::Seq).0, 0xCACBCDCE);
+
+        // PAL RAM 1K mirrors:
+        assert_eq!(memory.load32(0x05000000, AccessType::Seq).0, 0);
+        memory.store32(0x05000000, 0xCACBCDCE, AccessType::Seq);
+        assert_eq!(memory.load8(0x05000001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load8(0x05000401, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load16(0x05000002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load16(0x05000402, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load32(0x05000000, AccessType::Seq).0, 0xCACBCDCE);
+        assert_eq!(memory.load32(0x05000400, AccessType::Seq).0, 0xCACBCDCE);
+
+        // OAM 1K mirrors:
+        assert_eq!(memory.load32(0x07000000, AccessType::Seq).0, 0);
+        memory.store32(0x07000000, 0xCACBCDCE, AccessType::Seq);
+        assert_eq!(memory.load8(0x07000001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load8(0x07000401, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load16(0x07000002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load16(0x07000402, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load32(0x07000000, AccessType::Seq).0, 0xCACBCDCE);
+        assert_eq!(memory.load32(0x07000400, AccessType::Seq).0, 0xCACBCDCE);
+    }
+
+    /// Like other internal memory regions `VRAM` is also mirrored across its 24bit address space.
+    /// `VRAM` is `96K` in size it is mirrored in `128K` steps where the last `32K` chunk of each
+    /// step is a mirror of the previous `32K`.
+    ///
+    /// ```none
+    /// [          128K Region      ]  [          128K Region      ]
+    /// [ A: 64K] [ B: 32K] [B': 32K]  [ A: 64K] [ B: 32K] [B': 32K]
+    /// ```
+    #[test]
+    pub fn gba_vram_memory_mirrors() {
+        let mut memory = GbaMemory::new();
+
+        assert_eq!(memory.load32(0x06000000, AccessType::Seq).0, 0);
+        memory.store32(0x06000000, 0xCACBCDCE, AccessType::Seq);
+        memory.store32(0x06010004, 0xABACADAE, AccessType::Seq);
+
+        // Check 128K mirror:
+        assert_eq!(memory.load8(0x06000001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load8(0x06020001, AccessType::Seq).0, 0xCD);
+        assert_eq!(memory.load16(0x06000002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load16(0x06020002, AccessType::Seq).0, 0xCACB);
+        assert_eq!(memory.load32(0x06000000, AccessType::Seq).0, 0xCACBCDCE);
+        assert_eq!(memory.load32(0x06020000, AccessType::Seq).0, 0xCACBCDCE);
+
+        // Check 32K+32K mirror
+        assert_eq!(memory.load8(0x06010005, AccessType::Seq).0, 0xAD);
+        assert_eq!(memory.load8(0x06018005, AccessType::Seq).0, 0xAD);
+        assert_eq!(memory.load16(0x06010006, AccessType::Seq).0, 0xABAC);
+        assert_eq!(memory.load16(0x06018006, AccessType::Seq).0, 0xABAC);
+        assert_eq!(memory.load32(0x06010004, AccessType::Seq).0, 0xABACADAE);
+        assert_eq!(memory.load32(0x06018004, AccessType::Seq).0, 0xABACADAE);
     }
 }

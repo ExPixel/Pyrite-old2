@@ -7,7 +7,7 @@ impl GbaMemory {
         &self,
         address: u32,
         waitstate: u8,
-        access: AccessType,
+        mut access: AccessType,
     ) -> (u32, Waitstates) {
         let masked = (address & ROM_MAX_MASK) as usize;
         let value = if masked < self.rom.len() {
@@ -16,6 +16,7 @@ impl GbaMemory {
             0
         };
 
+        gamepak_access_fix(address, &mut access);
         let wait = self.gamepak_waitstates[((waitstate as usize) << 1) + (access as usize)]
             + self.gamepak_waitstates[((waitstate as usize) << 1) + 1];
 
@@ -26,7 +27,7 @@ impl GbaMemory {
         &self,
         address: u32,
         waitstate: u8,
-        access: AccessType,
+        mut access: AccessType,
     ) -> (u16, Waitstates) {
         let masked = (address & ROM_MAX_MASK) as usize;
         let value = if masked < self.rom.len() {
@@ -35,6 +36,7 @@ impl GbaMemory {
             0
         };
 
+        gamepak_access_fix(address, &mut access);
         let wait = self.gamepak_waitstates[((waitstate as usize) << 1) + (access as usize)]
             + self.gamepak_waitstates[((waitstate as usize) << 1) + 1];
 
@@ -45,7 +47,7 @@ impl GbaMemory {
         &self,
         address: u32,
         waitstate: u8,
-        access: AccessType,
+        mut access: AccessType,
     ) -> (u8, Waitstates) {
         let masked = (address & ROM_MAX_MASK) as usize;
         let value = if masked < self.rom.len() {
@@ -54,6 +56,7 @@ impl GbaMemory {
             0
         };
 
+        gamepak_access_fix(address, &mut access);
         let wait = self.gamepak_waitstates[((waitstate as usize) << 1) + (access as usize)]
             + self.gamepak_waitstates[((waitstate as usize) << 1) + 1];
 
@@ -62,34 +65,46 @@ impl GbaMemory {
 
     pub(super) fn store32_gamepak(
         &self,
-        _address: u32,
+        address: u32,
         _value: u32,
         waitstate: u8,
-        access: AccessType,
+        mut access: AccessType,
     ) -> Waitstates {
+        gamepak_access_fix(address, &mut access);
         self.gamepak_waitstates[((waitstate as usize) << 1) + (access as usize)]
             + self.gamepak_waitstates[((waitstate as usize) << 1) + 1]
     }
 
     pub(super) fn store16_gamepak(
         &self,
-        _address: u32,
+        address: u32,
         _value: u16,
         waitstate: u8,
-        access: AccessType,
+        mut access: AccessType,
     ) -> Waitstates {
+        gamepak_access_fix(address, &mut access);
         self.gamepak_waitstates[((waitstate as usize) << 1) + (access as usize)]
             + self.gamepak_waitstates[((waitstate as usize) << 1) + 1]
     }
 
     pub(super) fn store8_gamepak(
         &self,
-        _address: u32,
+        address: u32,
         _value: u8,
         waitstate: u8,
-        access: AccessType,
+        mut access: AccessType,
     ) -> Waitstates {
+        gamepak_access_fix(address, &mut access);
         self.gamepak_waitstates[((waitstate as usize) << 1) + (access as usize)]
             + self.gamepak_waitstates[((waitstate as usize) << 1) + 1]
+    }
+}
+
+/// Changes the given access type to nonsequential if the address is the start of
+/// a 128K block.
+#[inline(always)]
+fn gamepak_access_fix(address: u32, access: &mut AccessType) {
+    if (address & 0x1FFFF) == 0 {
+        *access = AccessType::NonSeq;
     }
 }

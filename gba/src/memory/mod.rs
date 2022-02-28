@@ -1,11 +1,13 @@
 mod gamepak;
-mod io;
+pub mod io;
 mod sram;
 
 use arm::{AccessType, Memory, Waitstates};
 use byteorder::{ByteOrder as _, LittleEndian as LE};
-use log::warn;
+use log::debug;
 use util::array;
+
+use self::io::IoRegisters;
 
 pub const REGION_BIOS: u32 = 0x0;
 pub const REGION_UNUSED_1: u32 = 0x1;
@@ -41,10 +43,10 @@ pub struct GbaMemory {
     bios: Box<[u8; BIOS_SIZE as usize]>,
     ewram: Box<[u8; EWRAM_SIZE as usize]>,
     iwram: Box<[u8; IWRAM_SIZE as usize]>,
-    ioregs: Box<[u8; IOREGS_SIZE as usize]>,
     palette: Box<[u8; PAL_SIZE as usize]>,
     vram: Box<[u8; 96 * VRAM_SIZE as usize]>,
     oam: Box<[u8; OAM_SIZE as usize]>,
+    pub(crate) ioregs: Box<IoRegisters>,
 
     rom: Vec<u8>,
 
@@ -63,11 +65,11 @@ impl GbaMemory {
             bios: array::boxed_copied(0),
             ewram: array::boxed_copied(0),
             iwram: array::boxed_copied(0),
-            ioregs: array::boxed_copied(0),
             palette: array::boxed_copied(0),
             vram: array::boxed_copied(0),
             oam: array::boxed_copied(0),
             rom: Vec::new(),
+            ioregs: Box::new(IoRegisters::default()),
 
             allow_bios_access: false,
             last_opcode: 0,
@@ -88,6 +90,14 @@ impl GbaMemory {
         self.rom = gamepak;
     }
 
+    pub fn ioregs(&self) -> &IoRegisters {
+        &self.ioregs
+    }
+
+    pub fn ioregs_mut(&mut self) -> &mut IoRegisters {
+        &mut self.ioregs
+    }
+
     pub fn view8(&mut self, address: u32) -> u8 {
         match address >> 24 {
             REGION_BIOS => self.bios.get(address as usize).copied().unwrap_or(0),
@@ -96,7 +106,7 @@ impl GbaMemory {
             REGION_IWRAM => self.iwram[(address & IWRAM_MASK) as usize],
             REGION_IOREGS => {
                 if address < IOREGS_SIZE {
-                    self.ioregs[address as usize]
+                    self.view8_io(address)
                 } else {
                     0
                 }
@@ -134,7 +144,7 @@ impl GbaMemory {
             REGION_IWRAM => LE::read_u16(&self.iwram[(address & IWRAM_MASK) as usize..]),
             REGION_IOREGS => {
                 if address < IOREGS_SIZE {
-                    LE::read_u16(&self.ioregs[address as usize..])
+                    self.view16_io(address)
                 } else {
                     0
                 }
@@ -172,7 +182,7 @@ impl GbaMemory {
             REGION_IWRAM => LE::read_u32(&self.iwram[(address & IWRAM_MASK) as usize..]),
             REGION_IOREGS => {
                 if address < IOREGS_SIZE {
-                    LE::read_u32(&self.ioregs[address as usize..])
+                    self.view32_io(address)
                 } else {
                     0
                 }
@@ -367,8 +377,8 @@ impl Memory for GbaMemory {
 
         address &= !0x3;
         match address >> 24 {
-            REGION_BIOS => warn!("write to BIOS 0x{:08X}=0x{:08X}", address, value),
-            REGION_UNUSED_1 => warn!("write to UNUSED 0x{:08X}=0x{:08X}", address, value),
+            REGION_BIOS => debug!("write to BIOS 0x{:08X}=0x{:08X}", address, value),
+            REGION_UNUSED_1 => debug!("write to UNUSED 0x{:08X}=0x{:08X}", address, value),
             REGION_EWRAM => {
                 LE::write_u32(&mut self.ewram[(address & EWRAM_MASK) as usize..], value);
                 wait = self.ewram_waitstates + self.ewram_waitstates;
@@ -404,8 +414,8 @@ impl Memory for GbaMemory {
 
         address &= !0x1;
         match address >> 24 {
-            REGION_BIOS => warn!("write to BIOS 0x{:08X}=0x{:08X}", address, value),
-            REGION_UNUSED_1 => warn!("write to UNUSED 0x{:08X}=0x{:08X}", address, value),
+            REGION_BIOS => debug!("write to BIOS 0x{:08X}=0x{:08X}", address, value),
+            REGION_UNUSED_1 => debug!("write to UNUSED 0x{:08X}=0x{:08X}", address, value),
             REGION_EWRAM => {
                 LE::write_u16(&mut self.ewram[(address & EWRAM_MASK) as usize..], value);
                 wait = self.ewram_waitstates;
@@ -440,8 +450,8 @@ impl Memory for GbaMemory {
         let mut wait = Waitstates::ZERO;
 
         match address >> 24 {
-            REGION_BIOS => warn!("write to BIOS 0x{:08X}=0x{:08X}", address, value),
-            REGION_UNUSED_1 => warn!("write to UNUSED 0x{:08X}=0x{:08X}", address, value),
+            REGION_BIOS => debug!("write to BIOS 0x{:08X}=0x{:08X}", address, value),
+            REGION_UNUSED_1 => debug!("write to UNUSED 0x{:08X}=0x{:08X}", address, value),
             REGION_EWRAM => {
                 self.ewram[(address & EWRAM_MASK) as usize] = value;
                 wait = self.ewram_waitstates;

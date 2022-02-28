@@ -2,10 +2,11 @@ pub trait Bits {
     fn bits(self, start: u32, end: u32) -> Self;
     fn bits_from(self, start: u32) -> Self;
     fn bit(self, offset: u32) -> Self;
+
     #[allow(clippy::wrong_self_convention)]
     fn is_bit_set(self, offset: u32) -> bool;
     fn replace_bits(self, start: u32, end: u32, value: Self) -> Self;
-    fn replace_bit(self, offset: u32, value: Self) -> Self;
+    fn replace_bit(self, offset: u32, value: bool) -> Self;
     fn sign_extend(self, bits: u32) -> Self;
 }
 
@@ -37,8 +38,8 @@ impl Bits for u32 {
     }
 
     #[inline(always)]
-    fn replace_bit(self, offset: u32, value: Self) -> Self {
-        self.replace_bits(offset, offset, value & 1)
+    fn replace_bit(self, offset: u32, value: bool) -> Self {
+        self.replace_bits(offset, offset, value as u32)
     }
 
     #[inline(always)]
@@ -75,8 +76,8 @@ impl Bits for u16 {
     }
 
     #[inline(always)]
-    fn replace_bit(self, offset: u32, value: Self) -> Self {
-        self.replace_bits(offset, offset, value & 1)
+    fn replace_bit(self, offset: u32, value: bool) -> Self {
+        self.replace_bits(offset, offset, value as u16)
     }
 
     #[inline(always)]

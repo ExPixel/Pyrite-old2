@@ -38,8 +38,15 @@ impl Gba {
     }
 
     pub fn frame(&mut self) {
-        let elem = self.video.buffer[0];
-        self.video.buffer.fill(elem.wrapping_add(1));
+        // wait until we are out of VBLANK
+        while self.mem.ioregs.vblank() {
+            self.step();
+        }
+
+        // Wait until the end of the frame (enter VBLANK)
+        while !self.mem.ioregs.vblank() {
+            self.step();
+        }
     }
 
     pub fn step(&mut self) {

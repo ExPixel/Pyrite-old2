@@ -25,6 +25,13 @@ fn run() -> anyhow::Result<()> {
         .try_init()
         .context("failed to initiaize logger")?;
 
+    let config = pyrite::config::from_toml_path("pyrite.toml")
+        .map_err(|err| {
+            let err = anyhow::Error::from(err);
+            log::error!("{:#}", err);
+        })
+        .unwrap_or_default();
+
     let frame_delay_target = std::time::Duration::from_secs_f64(1.0 / 60.0);
 
     let sdl_context = sdl2::init()
@@ -44,10 +51,13 @@ fn run() -> anyhow::Result<()> {
         .event_pump()
         .map_err(Error::msg)
         .context("failed to initialize SDL event pump")?;
-    let mut canvas = window
-        .into_canvas()
-        .accelerated()
-        .present_vsync()
+    let mut canvas_builder = window.into_canvas().accelerated();
+
+    if config.graphics.vsync.unwrap_or(true) {
+        canvas_builder = canvas_builder.present_vsync();
+    }
+
+    let mut canvas = canvas_builder
         .build()
         .context("failed to initialize SDL canvas")?;
     let texture_creator = canvas.texture_creator();

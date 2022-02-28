@@ -1,0 +1,6 @@
+[graphics]
+vsync = false
+fps = 60
+
+[gba]
+rom = ""

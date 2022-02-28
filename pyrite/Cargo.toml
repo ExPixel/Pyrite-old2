@@ -9,6 +9,12 @@ edition = "2021"
 gba = { path = "../gba" }
 log = "0.4"
 spin_sleep = "1.1.0"
+toml = "0.5"
+
+[dependencies.serde]
+version = "1"
+default-features = false
+features = ["derive"]
 
 [dependencies.crossbeam]
 version = "0.8.1"

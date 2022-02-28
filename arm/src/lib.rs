@@ -108,7 +108,6 @@ impl Cpu {
 
         let cycles = Cycles::ONE + fetch_wait;
 
-        
         if check_condition(exec_opcode >> 28, &self.registers) {
             cycles + exec_fn(self, memory, exec_opcode)
         } else {
@@ -408,6 +407,10 @@ pub struct Cycles(u32);
 impl Cycles {
     pub const ZERO: Cycles = Cycles(0);
     pub const ONE: Cycles = Cycles(1);
+
+    pub const fn new(cycles: u32) -> Self {
+        Cycles(cycles)
+    }
 }
 
 impl std::fmt::Display for Cycles {
@@ -458,14 +461,14 @@ impl std::ops::Sub<Cycles> for Cycles {
 
     #[inline]
     fn sub(self, other: Self) -> Self {
-        Cycles(self.0 - other.0)
+        Cycles(self.0.saturating_sub(other.0))
     }
 }
 
 impl std::ops::SubAssign<Cycles> for Cycles {
     #[inline]
     fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
+        self.0 = self.0.saturating_sub(other.0);
     }
 }
 

@@ -127,7 +127,6 @@ impl Cpu {
         self.registers.write(15, fetch_pc);
         let (fetched, fetch_wait) = memory.load16(fetch_pc, AccessType::Seq);
         self.fetched = fetched as u32;
-        self.registers.write(15, fetch_pc.wrapping_add(2));
 
         let cycles = Cycles::ONE + fetch_wait;
         cycles + exec_fn(self, memory, exec_opcode)

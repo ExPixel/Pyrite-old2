@@ -44,7 +44,7 @@ pub struct GbaMemory {
     ewram: Box<[u8; EWRAM_SIZE as usize]>,
     iwram: Box<[u8; IWRAM_SIZE as usize]>,
     palette: Box<[u8; PAL_SIZE as usize]>,
-    vram: Box<[u8; 96 * VRAM_SIZE as usize]>,
+    vram: Box<[u8; VRAM_SIZE as usize]>,
     oam: Box<[u8; OAM_SIZE as usize]>,
     pub(crate) ioregs: Box<IoRegisters>,
 

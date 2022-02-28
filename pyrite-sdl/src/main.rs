@@ -21,7 +21,7 @@ fn main() {
 
 fn run() -> anyhow::Result<()> {
     pretty_env_logger::formatted_builder()
-        .parse_filters("trace")
+        .parse_filters(&std::env::var("RUST_LOG").unwrap_or_else(|_| String::from("info")))
         .try_init()
         .context("failed to initiaize logger")?;
 
@@ -76,6 +76,7 @@ fn run() -> anyhow::Result<()> {
     let rom = get_rom_from_args().context("error occurred retrieving ROM from args")?;
     gba.after_frame_wait(move |gba, _| {
         gba.set_gamepak(rom);
+        gba.reset();
     });
 
     let screen = screen_buffer.clone();
@@ -137,6 +138,15 @@ fn run() -> anyhow::Result<()> {
                 .context("failed to set window title")?;
         }
     }
+
+    gba.set_paused(true);
+    gba.after_frame_wait(|gba, _| {
+        log::debug!(
+            "end address: 0x{:08X} (THUMB: {})",
+            gba.cpu().next_exec_pc(),
+            gba.cpu().registers.getf_t()
+        );
+    });
 
     log::info!("exiting...");
 

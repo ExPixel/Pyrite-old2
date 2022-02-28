@@ -79,8 +79,8 @@ impl GbaMemory {
         }
     }
 
-    pub fn init(&mut self) {
-        self.set_waitcnt(0x4317);
+    pub(crate) fn init(&mut self) {
+        self.store16_io(io::WAITCNT, 0x4317);
         self.ewram_waitstates = 2.into();
     }
 

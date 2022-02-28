@@ -10,6 +10,7 @@ use crossbeam::{
 use gba::Gba;
 
 type GbaThreadCallback = Box<dyn 'static + Send + FnMut(&mut Gba, &mut GbaThreadState)>;
+type GbaThreadCallbackOnce = Box<dyn 'static + Send + FnOnce(&mut Gba, &mut GbaThreadState)>;
 
 fn gba_thread_fn(rx: Receiver<GbaMessage>) {
     let mut ctx = Context::default();
@@ -77,7 +78,7 @@ fn process_gba_message(ctx: &mut Context, msg: GbaMessage) {
             log::trace!("GBA thread shutdown requested");
             ctx.state.stopped = true;
         }
-        GbaMessage::CallbackAfterFrame(mut cb) => (cb)(&mut ctx.gba, &mut ctx.state),
+        GbaMessage::CallbackAfterFrame(cb) => (cb)(&mut ctx.gba, &mut ctx.state),
         GbaMessage::CallbackOnFrame(cb) => ctx.on_frame.push(cb),
     }
 }
@@ -135,7 +136,7 @@ impl GbaHandle {
 
     pub fn after_frame<F>(&self, cb: F)
     where
-        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
+        F: 'static + Send + FnOnce(&mut Gba, &mut GbaThreadState),
     {
         if self
             .tx
@@ -146,9 +147,9 @@ impl GbaHandle {
         }
     }
 
-    pub fn after_frame_wait<F>(&self, mut cb: F)
+    pub fn after_frame_wait<F>(&self, cb: F)
     where
-        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
+        F: 'static + Send + FnOnce(&mut Gba, &mut GbaThreadState),
     {
         let mut parker = self.parker.borrow_mut();
         if parker.is_none() {
@@ -192,7 +193,7 @@ impl Default for GbaHandle {
 }
 
 enum GbaMessage {
-    CallbackAfterFrame(GbaThreadCallback),
+    CallbackAfterFrame(GbaThreadCallbackOnce),
     CallbackOnFrame(GbaThreadCallback),
     Shutdown,
 }

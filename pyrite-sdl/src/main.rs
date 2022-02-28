@@ -73,6 +73,11 @@ fn run() -> anyhow::Result<()> {
 
     let gba = pyrite::GbaHandle::new();
 
+    let rom = get_rom_from_args().context("error occurred retrieving ROM from args")?;
+    gba.after_frame_wait(move |gba, _| {
+        gba.set_gamepak(rom);
+    });
+
     let screen = screen_buffer.clone();
     gba.on_frame(move |gba, _| {
         let mut screen = screen.lock().expect("failed to lock screen buffer");
@@ -136,6 +141,15 @@ fn run() -> anyhow::Result<()> {
     log::info!("exiting...");
 
     Ok(())
+}
+
+fn get_rom_from_args() -> anyhow::Result<Vec<u8>> {
+    let rom_path = std::env::args()
+        .nth(1)
+        .map(std::path::PathBuf::from)
+        .ok_or_else(|| anyhow::anyhow!("expected ROM path as first argument"))?;
+    std::fs::read(&rom_path)
+        .with_context(|| format!("failed to read ROM path `{}`", rom_path.display()))
 }
 
 #[derive(Default)]

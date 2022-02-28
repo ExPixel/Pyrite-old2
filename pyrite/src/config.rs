@@ -26,14 +26,12 @@ impl Default for GraphicsConfig {
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct GbaConfig {
-    pub rom: Option<PathBuf>,
-}
+pub struct GbaConfig {}
 
 #[allow(clippy::derivable_impls)]
 impl Default for GbaConfig {
     fn default() -> GbaConfig {
-        GbaConfig { rom: None }
+        GbaConfig {}
     }
 }
 

@@ -123,7 +123,7 @@ impl Cpu {
         self.decoded = self.fetched;
         self.decoded_fn = Self::decode_thumb_opcode(self.decoded);
 
-        let fetch_pc = (self.registers.read(15) & !0x3).wrapping_add(2);
+        let fetch_pc = (self.registers.read(15) & !0x1).wrapping_add(2);
         self.registers.write(15, fetch_pc);
         let (fetched, fetch_wait) = memory.load16(fetch_pc, AccessType::Seq);
         self.fetched = fetched as u32;

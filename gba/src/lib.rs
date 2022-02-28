@@ -1,4 +1,4 @@
-mod memory;
+pub mod memory;
 mod scheduler;
 mod video;
 
@@ -60,6 +60,10 @@ impl Gba {
 
     pub fn video(&self) -> &GbaVideo {
         &self.video
+    }
+
+    pub fn cpu(&self) -> &Cpu {
+        &self.cpu
     }
 }
 

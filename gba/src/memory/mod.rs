@@ -468,8 +468,28 @@ impl Memory for GbaMemory {
 
             REGION_PAL => self.palette.store8(address, value),
 
-            REGION_VRAM => self.vram[vram_offset(address)] = value,
-            REGION_OAM => self.oam[(address & OAM_MASK) as usize] = value,
+            REGION_VRAM => {
+                // Writes to OBJ memory (6000000h-600FFFFh or 6000000h-6013FFFh in Bitmap mode)
+                // are ignored and the memory contents remain unchanged. Writes outside of the OBJ
+                // range write the 8bit value to both the upper and lower bytes of the addressed
+                // halfword.
+
+                let obj_range = if self.ioregs.is_bitmap_mode() {
+                    0x6014000..0x6018000
+                } else {
+                    0x6010000..0x6018000
+                };
+
+                if !obj_range.contains(&address) {
+                    let address = vram_offset(address) & !0x1;
+                    self.vram[address] = value;
+                    self.vram[address + 1] = value;
+                }
+            }
+
+            REGION_OAM => {
+                // Writes to OAM are ignored and the contents of memory remain unchanged.
+            }
 
             REGION_GAMEPAK0_LO | REGION_GAMEPAK0_HI => {
                 wait = self.store8_gamepak(address, value, 0, access)

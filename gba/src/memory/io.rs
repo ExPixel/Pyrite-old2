@@ -186,6 +186,14 @@ impl IoRegisters {
     pub fn vcount_setting(&self) -> u16 {
         self.dispstat >> 8
     }
+
+    pub fn bg_mode(&self) -> u16 {
+        self.dispcnt & 0x7
+    }
+
+    pub fn is_bitmap_mode(&self) -> bool {
+        (3..6).contains(&self.bg_mode())
+    }
 }
 
 fn set_preserve_bits<T>(dst: &mut T, src: T, readonly_mask: T)

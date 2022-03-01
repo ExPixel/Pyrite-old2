@@ -16,9 +16,9 @@ impl LineBuffer {
         self.pixels[bg][x] = pixel;
     }
 
-    pub fn get(&self, bg: usize, x: usize) -> u16 {
-        self.pixels[bg][x]
-    }
+    // pub fn get(&self, bg: usize, x: usize) -> u16 {
+    //     self.pixels[bg][x]
+    // }
 
     pub fn bg(&self, bg: usize) -> &[u16; 240] {
         &self.pixels[bg]

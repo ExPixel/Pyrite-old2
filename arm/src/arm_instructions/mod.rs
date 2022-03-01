@@ -22,7 +22,6 @@ use self::instr_single_data_transfer::*;
 
 use super::{Cpu, CpuException, Cycles, InstrFunction, Memory};
 
-use util::bits::Bits;
 use util::bits::Bits as _;
 
 /// Branch and Exchange

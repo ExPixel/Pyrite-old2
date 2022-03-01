@@ -1,5 +1,6 @@
 mod gamepak;
 pub mod io;
+pub mod palette;
 mod sram;
 
 use arm::{AccessType, Memory, Waitstates};
@@ -7,7 +8,7 @@ use byteorder::{ByteOrder as _, LittleEndian as LE};
 use log::debug;
 use util::array;
 
-use self::io::IoRegisters;
+use self::{io::IoRegisters, palette::Palette};
 
 pub const REGION_BIOS: u32 = 0x0;
 pub const REGION_UNUSED_1: u32 = 0x1;
@@ -43,7 +44,7 @@ pub struct GbaMemory {
     pub(crate) bios: Box<[u8; BIOS_SIZE as usize]>,
     pub(crate) ewram: Box<[u8; EWRAM_SIZE as usize]>,
     pub(crate) iwram: Box<[u8; IWRAM_SIZE as usize]>,
-    pub(crate) palette: Box<[u8; PAL_SIZE as usize]>,
+    pub(crate) palette: Palette,
     pub(crate) vram: Box<[u8; VRAM_SIZE as usize]>,
     pub(crate) oam: Box<[u8; OAM_SIZE as usize]>,
     pub(crate) ioregs: Box<IoRegisters>,
@@ -65,7 +66,7 @@ impl GbaMemory {
             bios: array::boxed_copied(0),
             ewram: array::boxed_copied(0),
             iwram: array::boxed_copied(0),
-            palette: array::boxed_copied(0),
+            palette: Palette::default(),
             vram: array::boxed_copied(0),
             oam: array::boxed_copied(0),
             rom: Vec::new(),
@@ -116,7 +117,7 @@ impl GbaMemory {
                     0
                 }
             }
-            REGION_PAL => self.palette[(address & PAL_MASK) as usize],
+            REGION_PAL => self.palette.view8(address),
             REGION_VRAM => self.vram[vram_offset(address)],
             REGION_OAM => self.oam[(address & OAM_MASK) as usize],
 
@@ -154,7 +155,7 @@ impl GbaMemory {
                     0
                 }
             }
-            REGION_PAL => LE::read_u16(&self.palette[(address & PAL_MASK) as usize..]),
+            REGION_PAL => self.palette.view16(address),
             REGION_VRAM => LE::read_u16(&self.vram[vram_offset(address)..]),
             REGION_OAM => LE::read_u16(&self.oam[(address & OAM_MASK) as usize..]),
 
@@ -192,7 +193,7 @@ impl GbaMemory {
                     0
                 }
             }
-            REGION_PAL => LE::read_u32(&self.palette[(address & PAL_MASK) as usize..]),
+            REGION_PAL => self.palette.view32(address),
             REGION_VRAM => LE::read_u32(&self.vram[vram_offset(address)..]),
             REGION_OAM => LE::read_u32(&self.oam[(address & OAM_MASK) as usize..]),
 
@@ -281,7 +282,7 @@ impl Memory for GbaMemory {
             REGION_IWRAM => value = LE::read_u32(&self.iwram[(address & IWRAM_MASK) as usize..]),
             REGION_IOREGS => value = self.load32_io(address),
             REGION_PAL => {
-                value = LE::read_u32(&self.palette[(address & PAL_MASK) as usize..]);
+                value = self.palette.load32(address);
                 wait += Waitstates::ONE;
             }
             REGION_VRAM => {
@@ -321,7 +322,7 @@ impl Memory for GbaMemory {
             }
             REGION_IWRAM => value = LE::read_u16(&self.iwram[(address & IWRAM_MASK) as usize..]),
             REGION_IOREGS => value = self.load16_io(address),
-            REGION_PAL => value = LE::read_u16(&self.palette[(address & PAL_MASK) as usize..]),
+            REGION_PAL => value = self.palette.load16(address),
             REGION_VRAM => value = LE::read_u16(&self.vram[vram_offset(address)..]),
             REGION_OAM => value = LE::read_u16(&self.oam[(address & OAM_MASK) as usize..]),
             REGION_GAMEPAK0_LO | REGION_GAMEPAK0_HI => {
@@ -358,7 +359,7 @@ impl Memory for GbaMemory {
             }
             REGION_IWRAM => value = self.iwram[(address & IWRAM_MASK) as usize],
             REGION_IOREGS => value = self.load8_io(address),
-            REGION_PAL => value = self.palette[(address & PAL_MASK) as usize],
+            REGION_PAL => value = self.palette.load8(address),
             REGION_VRAM => value = self.vram[vram_offset(address)],
             REGION_OAM => value = self.oam[(address & OAM_MASK) as usize],
             REGION_GAMEPAK0_LO | REGION_GAMEPAK0_HI => {
@@ -393,7 +394,7 @@ impl Memory for GbaMemory {
             }
 
             REGION_IOREGS => self.store32_io(address, value),
-            REGION_PAL => LE::write_u32(&mut self.palette[(address & PAL_MASK) as usize..], value),
+            REGION_PAL => self.palette.store32(address, value),
             REGION_VRAM => LE::write_u32(&mut self.vram[vram_offset(address)..], value),
             REGION_OAM => LE::write_u32(&mut self.oam[(address & OAM_MASK) as usize..], value),
 
@@ -430,7 +431,7 @@ impl Memory for GbaMemory {
             }
 
             REGION_IOREGS => self.store16_io(address, value),
-            REGION_PAL => LE::write_u16(&mut self.palette[(address & PAL_MASK) as usize..], value),
+            REGION_PAL => self.palette.store16(address, value),
             REGION_VRAM => LE::write_u16(&mut self.vram[vram_offset(address)..], value),
             REGION_OAM => LE::write_u16(&mut self.oam[(address & OAM_MASK) as usize..], value),
 
@@ -464,7 +465,9 @@ impl Memory for GbaMemory {
             REGION_IWRAM => self.iwram[(address & IWRAM_MASK) as usize] = value,
 
             REGION_IOREGS => self.store8_io(address, value),
-            REGION_PAL => self.palette[(address & PAL_MASK) as usize] = value,
+
+            REGION_PAL => self.palette.store8(address, value),
+
             REGION_VRAM => self.vram[vram_offset(address)] = value,
             REGION_OAM => self.oam[(address & OAM_MASK) as usize] = value,
 

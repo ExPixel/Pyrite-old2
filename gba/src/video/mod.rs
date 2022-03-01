@@ -1,8 +1,12 @@
+mod line;
 mod mode3;
+mod mode4;
 
 use arm::Cycles;
 
 use crate::{scheduler::Scheduler, GbaMemory};
+
+use self::line::LineBuffer;
 
 pub const SCREEN_WIDTH: usize = 240;
 pub const SCREEN_HEIGHT: usize = 160;
@@ -13,13 +17,13 @@ const HBLANK_CYCLES: Cycles = Cycles::new(272);
 
 pub struct GbaVideo {
     scheduler: Scheduler,
-    pub(crate) buffer: [u16; SCREEN_PIXEL_COUNT],
+    pub(crate) screen: [u16; SCREEN_PIXEL_COUNT],
 }
 
 impl GbaVideo {
     pub fn new(scheduler: Scheduler) -> Self {
-        let buffer = [0u16; SCREEN_PIXEL_COUNT];
-        GbaVideo { scheduler, buffer }
+        let screen = [0u16; SCREEN_PIXEL_COUNT];
+        GbaVideo { scheduler, screen }
     }
 
     pub(crate) fn init(&mut self, mem: &mut GbaMemory) {
@@ -63,10 +67,10 @@ impl GbaVideo {
         let line = mem.ioregs.vcount;
 
         if line < 160 {
-            let buf_start = line as usize * 240;
-            let buf_end = buf_start + 240;
-            let buf = &mut self.buffer[buf_start..buf_end];
-            mode3::render(line, buf.try_into().unwrap(), &mem.vram);
+            let output_buf_start = line as usize * 240;
+            let output_buf_end = output_buf_start + 240;
+            let output_buf = &mut self.screen[output_buf_start..output_buf_end];
+            Self::render_line(line, output_buf, mem);
         }
 
         self.scheduler.schedule(
@@ -75,7 +79,23 @@ impl GbaVideo {
         );
     }
 
-    pub fn buffer(&self) -> &[u16; SCREEN_PIXEL_COUNT] {
-        &self.buffer
+    fn render_line(line: u16, output: &mut [u16], mem: &GbaMemory) {
+        let mut buf = LineBuffer::default();
+
+        match mem.ioregs.bg_mode() {
+            3 => {
+                mode3::render(line, &mut buf, &mem.vram);
+                output.copy_from_slice(buf.bg(2));
+            }
+            4 => {
+                mode4::render(line, &mut buf, &mem.ioregs, &mem.palette, &mem.vram);
+                output.copy_from_slice(buf.bg(2));
+            }
+            _ => {}
+        }
+    }
+
+    pub fn screen(&self) -> &[u16; SCREEN_PIXEL_COUNT] {
+        &self.screen
     }
 }

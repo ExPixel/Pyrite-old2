@@ -90,7 +90,7 @@ fn run() -> anyhow::Result<()> {
     let screen = screen_buffer.clone();
     gba.on_frame(move |gba, state| {
         let mut screen = screen.lock().expect("failed to lock screen buffer");
-        screen.copy_from_slice(gba.video().buffer());
+        screen.copy_from_slice(gba.video().screen());
 
         let frame_duration_us: u64 = state.frame_duration().as_micros().try_into().unwrap();
         frame_duration_accumulate_gba.fetch_add(frame_duration_us, atomic::Ordering::Release);

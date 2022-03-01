@@ -14,8 +14,12 @@ impl GbaMemory {
         match address {
             // LCD
             DISPCNT => self.ioregs.dispcnt,
+            GREENSWAP => self.ioregs.greenswap,
             DISPSTAT => self.ioregs.dispstat,
             VCOUNT => self.ioregs.vcount,
+
+            // Keypad Input
+            KEYINPUT => 0xFFFF,
 
             WAITCNT => self.ioregs.waitcnt,
             _ => {
@@ -39,6 +43,7 @@ impl GbaMemory {
         match address {
             // LCD
             DISPCNT => self.ioregs.set_dispcnt(value),
+            GREENSWAP => self.ioregs.greenswap = value,
             DISPSTAT => self.ioregs.set_dispstat(value),
             VCOUNT => { /* NOP */ }
 
@@ -125,6 +130,7 @@ impl GbaMemory {
 #[derive(Default)]
 pub struct IoRegisters {
     pub(crate) dispcnt: u16,
+    pub(crate) greenswap: u16,
     pub(crate) dispstat: u16,
     pub(crate) waitcnt: u16,
     pub(crate) vcount: u16,
@@ -193,6 +199,10 @@ impl IoRegisters {
 
     pub fn is_bitmap_mode(&self) -> bool {
         (3..6).contains(&self.bg_mode())
+    }
+
+    pub fn display_frame(&self) -> u16 {
+        self.dispcnt.bit(4)
     }
 }
 

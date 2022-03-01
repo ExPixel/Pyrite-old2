@@ -90,6 +90,11 @@ impl GbaMemory {
         self.rom = gamepak;
     }
 
+    pub fn set_bios(&mut self, mut bios: Vec<u8>) {
+        bios.resize(BIOS_SIZE as usize, 0);
+        self.bios = bios.into_boxed_slice().try_into().unwrap();
+    }
+
     pub fn ioregs(&self) -> &IoRegisters {
         &self.ioregs
     }

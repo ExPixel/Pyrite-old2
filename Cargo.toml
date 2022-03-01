@@ -2,7 +2,12 @@
 members = ["pyrite", "gba", "arm", "pyrite-sdl"]
 resolver = "2"
 
+[profile.dev]
+opt-level = 2
+debug-assertions = true
+
 # This will optimize all dependencies but should leave workspace members alone.
 [profile.dev.package."*"]
 opt-level = 3
+debug = 1 # line tables only
 debug-assertions = true

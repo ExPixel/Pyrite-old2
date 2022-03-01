@@ -1,5 +1,8 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{self, AtomicU32, AtomicU64},
+        Arc, Mutex,
+    },
     time::Instant,
 };
 
@@ -79,10 +82,19 @@ fn run() -> anyhow::Result<()> {
         gba.reset();
     });
 
+    let frame_duration_accumulate = Arc::new(AtomicU64::new(0));
+    let frame_duration_count = Arc::new(AtomicU32::new(0));
+
+    let frame_duration_accumulate_gba = frame_duration_accumulate.clone();
+    let frame_duration_count_gba = frame_duration_count.clone();
     let screen = screen_buffer.clone();
-    gba.on_frame(move |gba, _| {
+    gba.on_frame(move |gba, state| {
         let mut screen = screen.lock().expect("failed to lock screen buffer");
         screen.copy_from_slice(gba.video().buffer());
+
+        let frame_duration_us: u64 = state.frame_duration().as_micros().try_into().unwrap();
+        frame_duration_accumulate_gba.fetch_add(frame_duration_us, atomic::Ordering::Release);
+        frame_duration_count_gba.fetch_add(1, atomic::Ordering::Release);
     });
     gba.set_paused(false);
 
@@ -131,7 +143,25 @@ fn run() -> anyhow::Result<()> {
         }
 
         if let Some(fps) = fps_counter.count(frame_end_time) {
-            let title = format!("Pyrite ({:.1} FPS)", fps);
+            const GBA_TARGET_FRAME_DURATION_US: f64 = 1000000.0 / 60.0;
+
+            let frame_duration_accumulate_value =
+                frame_duration_accumulate.load(atomic::Ordering::Acquire);
+            let frame_duration_count_value = frame_duration_count.load(atomic::Ordering::Acquire);
+            let average_frame_duration_us =
+                frame_duration_accumulate_value as f64 / frame_duration_count_value as f64;
+            frame_duration_accumulate
+                .fetch_sub(frame_duration_accumulate_value, atomic::Ordering::Release);
+            frame_duration_count.fetch_sub(frame_duration_count_value, atomic::Ordering::Release);
+
+            let gba_average_frame_duration = average_frame_duration_us / 1000.0;
+            let gba_performance_percentage =
+                (GBA_TARGET_FRAME_DURATION_US / average_frame_duration_us) * 100.0;
+
+            let title = format!(
+                "Pyrite ({:.1} FPS) (GBA: {:.1} ms | {:.1} %)",
+                fps, gba_average_frame_duration, gba_performance_percentage
+            );
             canvas
                 .window_mut()
                 .set_title(&title)

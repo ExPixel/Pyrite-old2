@@ -36,6 +36,7 @@ fn gba_thread_fn(rx: Receiver<GbaMessage>) {
             wait_for_gba_unpause(&mut ctx, &rx);
         } else {
             let frame_duration = frame_start_time.elapsed();
+            ctx.state.frame_duration = frame_duration;
             let target_frame_duration = Duration::from_secs_f64(1.0 / ctx.state.target_fps);
             if frame_duration < target_frame_duration {
                 spin_sleeper.sleep(target_frame_duration - frame_duration);
@@ -95,6 +96,8 @@ pub struct GbaThreadState {
     pub paused: bool,
     stopped: bool,
     pub target_fps: f64,
+
+    frame_duration: Duration,
 }
 
 impl GbaThreadState {
@@ -104,6 +107,11 @@ impl GbaThreadState {
 
     pub fn stopping(&self) -> bool {
         self.stopped
+    }
+
+    /// Returns the amount of time required to render the previous frame.
+    pub fn frame_duration(&self) -> Duration {
+        self.frame_duration
     }
 }
 
@@ -158,12 +166,16 @@ impl GbaHandle {
         let parker = parker.as_mut().unwrap();
         let unparker = parker.unparker().clone();
 
-        self.after_frame(move |gba, state| {
+        let msg = GbaMessage::CallbackAfterFrame(Box::new(move |gba, state| {
             (cb)(gba, state);
             unparker.unpark();
-        });
+        }));
 
-        parker.park();
+        if self.tx.send(msg).is_err() {
+            log::warn!("called `after_frame_wait` on disconnected GBA handle")
+        } else {
+            parker.park();
+        }
     }
 
     pub fn set_paused(&self, paused: bool) {

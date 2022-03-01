@@ -40,12 +40,12 @@ pub const OAM_MASK: u32 = 0x3FF;
 pub const ROM_MAX_MASK: u32 = 0xFFFFFF;
 
 pub struct GbaMemory {
-    bios: Box<[u8; BIOS_SIZE as usize]>,
-    ewram: Box<[u8; EWRAM_SIZE as usize]>,
-    iwram: Box<[u8; IWRAM_SIZE as usize]>,
-    palette: Box<[u8; PAL_SIZE as usize]>,
-    vram: Box<[u8; VRAM_SIZE as usize]>,
-    oam: Box<[u8; OAM_SIZE as usize]>,
+    pub(crate) bios: Box<[u8; BIOS_SIZE as usize]>,
+    pub(crate) ewram: Box<[u8; EWRAM_SIZE as usize]>,
+    pub(crate) iwram: Box<[u8; IWRAM_SIZE as usize]>,
+    pub(crate) palette: Box<[u8; PAL_SIZE as usize]>,
+    pub(crate) vram: Box<[u8; VRAM_SIZE as usize]>,
+    pub(crate) oam: Box<[u8; OAM_SIZE as usize]>,
     pub(crate) ioregs: Box<IoRegisters>,
 
     rom: Vec<u8>,

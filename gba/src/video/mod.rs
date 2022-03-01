@@ -1,3 +1,5 @@
+mod mode3;
+
 use arm::Cycles;
 
 use crate::{scheduler::Scheduler, GbaMemory};
@@ -57,6 +59,16 @@ impl GbaVideo {
 
     fn enter_hblank(&mut self, mem: &mut GbaMemory, late: Cycles) {
         mem.ioregs.set_hblank(true);
+
+        let line = mem.ioregs.vcount;
+
+        if line < 160 {
+            let buf_start = line as usize * 240;
+            let buf_end = buf_start + 240;
+            let buf = &mut self.buffer[buf_start..buf_end];
+            mode3::render(line, buf.try_into().unwrap(), &mem.vram);
+        }
+
         self.scheduler.schedule(
             |gba, late| gba.video.exit_hblank(&mut gba.mem, late),
             HBLANK_CYCLES - late,

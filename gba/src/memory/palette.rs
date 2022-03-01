@@ -16,6 +16,15 @@ impl Default for Palette {
 }
 
 impl Palette {
+    pub fn get_bg256(&self, idx: u8) -> u16 {
+        self.view16((idx as u32) * 2)
+    }
+
+    pub fn get_obj256(&self, idx: u8) -> u16 {
+        let addr = (idx as u32) * 2 + 0x200;
+        self.view16(addr)
+    }
+
     pub fn load32(&self, address: u32) -> u32 {
         LE::read_u32(&self.data[(address & PAL_MASK) as usize..])
     }

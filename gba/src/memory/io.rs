@@ -19,7 +19,7 @@ impl GbaMemory {
             VCOUNT => self.ioregs.vcount,
 
             // Keypad Input
-            KEYINPUT => 0xFFFF,
+            KEYINPUT => self.ioregs.keyinput,
 
             WAITCNT => self.ioregs.waitcnt,
             _ => {
@@ -46,6 +46,9 @@ impl GbaMemory {
             GREENSWAP => self.ioregs.greenswap = value,
             DISPSTAT => self.ioregs.set_dispstat(value),
             VCOUNT => { /* NOP */ }
+
+            // Keypad Input
+            KEYINPUT => { /*NOP */ }
 
             WAITCNT => {
                 self.ioregs.set_waitcnt(value);
@@ -129,14 +132,22 @@ impl GbaMemory {
 
 #[derive(Default)]
 pub struct IoRegisters {
+    // LCD
     pub(crate) dispcnt: u16,
     pub(crate) greenswap: u16,
     pub(crate) dispstat: u16,
     pub(crate) waitcnt: u16,
     pub(crate) vcount: u16,
+
+    // Keypad Input
+    pub(crate) keyinput: u16,
 }
 
 impl IoRegisters {
+    pub fn init(&mut self) {
+        self.keyinput = 0x3ff;
+    }
+
     pub fn waitcnt(&self) -> u16 {
         self.waitcnt
     }

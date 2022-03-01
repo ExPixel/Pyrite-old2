@@ -85,6 +85,7 @@ impl GbaMemory {
     pub(crate) fn init(&mut self) {
         self.store16_io(io::WAITCNT, 0x4317);
         self.ewram_waitstates = 2.into();
+        self.ioregs.init();
     }
 
     pub fn set_gamepak(&mut self, gamepak: Vec<u8>) {

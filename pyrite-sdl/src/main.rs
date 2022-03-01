@@ -1,12 +1,13 @@
 use std::{
     sync::{
-        atomic::{self, AtomicU32, AtomicU64},
+        atomic::{self, AtomicU16, AtomicU32, AtomicU64},
         Arc, Mutex,
     },
     time::Instant,
 };
 
 use anyhow::{Context as _, Error};
+use gba::{Button, ButtonSet};
 use sdl2::{
     event::Event,
     pixels::{Color, PixelFormatEnum},
@@ -82,6 +83,10 @@ fn run() -> anyhow::Result<()> {
         gba.reset();
     });
 
+    let mut buttons = ButtonSet::default();
+    let buttons_u16 = Arc::new(AtomicU16::new(buttons.into()));
+    let buttons_u16_gba = buttons_u16.clone();
+
     let frame_duration_accumulate = Arc::new(AtomicU64::new(0));
     let frame_duration_count = Arc::new(AtomicU32::new(0));
 
@@ -89,6 +94,9 @@ fn run() -> anyhow::Result<()> {
     let frame_duration_count_gba = frame_duration_count.clone();
     let screen = screen_buffer.clone();
     gba.on_frame(move |gba, state| {
+        let buttons = buttons_u16_gba.load(atomic::Ordering::Acquire);
+        gba.set_buttons(ButtonSet::from(buttons));
+
         let mut screen = screen.lock().expect("failed to lock screen buffer");
         screen.copy_from_slice(gba.video().screen());
 
@@ -106,11 +114,35 @@ fn run() -> anyhow::Result<()> {
         let frame_start_time = Instant::now();
 
         for event in event_pump.poll_iter() {
-            if let Event::Quit { .. } = event {
-                log::trace!("exiting SDL loop...");
-                break 'main_loop;
+            match event {
+                Event::Quit { .. } => {
+                    log::trace!("exiting SDL loop...");
+                    break 'main_loop;
+                }
+
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => {
+                    if let Some(button) = keycode_to_button(keycode) {
+                        buttons.set_pressed(button, true)
+                    }
+                }
+
+                Event::KeyUp {
+                    keycode: Some(keycode),
+                    ..
+                } => {
+                    if let Some(button) = keycode_to_button(keycode) {
+                        buttons.set_pressed(button, false)
+                    }
+                }
+
+                _ => (),
             }
         }
+
+        buttons_u16.store(buttons.into(), atomic::Ordering::Release);
 
         gba_frame_texture
             .with_lock(None, |buffer: &mut [u8], pitch: usize| {
@@ -217,5 +249,21 @@ impl FPSCounter {
         self.frames = 0;
 
         Some(fps)
+    }
+}
+
+fn keycode_to_button(keycode: sdl2::keyboard::Keycode) -> Option<Button> {
+    match keycode {
+        sdl2::keyboard::Keycode::Z => Some(Button::A),
+        sdl2::keyboard::Keycode::X => Some(Button::B),
+        sdl2::keyboard::Keycode::Left => Some(Button::Left),
+        sdl2::keyboard::Keycode::Right => Some(Button::Right),
+        sdl2::keyboard::Keycode::Up => Some(Button::Up),
+        sdl2::keyboard::Keycode::Down => Some(Button::Down),
+        sdl2::keyboard::Keycode::A => Some(Button::L),
+        sdl2::keyboard::Keycode::S => Some(Button::R),
+        sdl2::keyboard::Keycode::Return => Some(Button::Start),
+        sdl2::keyboard::Keycode::Backspace => Some(Button::Select),
+        _ => None,
     }
 }

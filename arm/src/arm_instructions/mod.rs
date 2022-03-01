@@ -11,6 +11,8 @@ mod instr_mul;
 #[allow(dead_code, unused_variables, unused_imports)]
 mod instr_single_data_transfer;
 
+use crate::AccessType;
+
 use self::instr_block_data_transfer::*;
 use self::instr_coprocessor::*;
 use self::instr_dataproc::*;
@@ -20,6 +22,7 @@ use self::instr_single_data_transfer::*;
 
 use super::{Cpu, CpuException, Cycles, InstrFunction, Memory};
 
+use util::bits::Bits;
 use util::bits::Bits as _;
 
 /// Branch and Exchange
@@ -152,13 +155,37 @@ pub fn arm_msr_rs(cpu: &mut Cpu, _memory: &mut dyn Memory, instr: u32) -> Cycles
 }
 
 /// Swap registers with memory word
-pub fn arm_swp(_cpu: &mut Cpu, _memory: &mut dyn Memory, _instr: u32) -> Cycles {
-    todo!("unimplemented")
+pub fn arm_swp(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
+    let rn = instr.bits(16, 19);
+    let rd = instr.bits(12, 15);
+    let rm = instr.bits(0, 3);
+
+    let base = cpu.registers.read(rn);
+    let src = cpu.registers.read(rm);
+
+    let (tmp, wait_load) = memory.load32(base, AccessType::NonSeq);
+    cpu.registers.write(rd, tmp);
+    let wait_store = memory.store32(base, src, AccessType::NonSeq);
+
+    memory.stall(Cycles::ONE);
+    Cycles::ONE + wait_load + wait_store
 }
 
 /// Swap registers with memory byte
-pub fn arm_swpb(_cpu: &mut Cpu, _memory: &mut dyn Memory, _instr: u32) -> Cycles {
-    todo!("unimplemented")
+pub fn arm_swpb(cpu: &mut Cpu, memory: &mut dyn Memory, instr: u32) -> Cycles {
+    let rn = instr.bits(16, 19);
+    let rd = instr.bits(12, 15);
+    let rm = instr.bits(0, 3);
+
+    let base = cpu.registers.read(rn);
+    let src = cpu.registers.read(rm) as u8;
+
+    let (tmp, wait_load) = memory.load8(base, AccessType::NonSeq);
+    cpu.registers.write(rd, tmp as u32);
+    let wait_store = memory.store8(base, src, AccessType::NonSeq);
+
+    memory.stall(Cycles::ONE);
+    Cycles::ONE + wait_load + wait_store
 }
 
 /// SWI INSTR

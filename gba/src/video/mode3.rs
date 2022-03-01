@@ -1,9 +1,6 @@
 use crate::memory::VRAM_SIZE;
 use byteorder::{ByteOrder as _, LittleEndian as LE};
 
-// /// 75 KiB VRAM chunk used for mode 3.
-// pub type Mode3Memory = [u8; 0x12C00];
-
 /// Render a single line in mode3.
 ///
 /// **BG Mode 3 - 240x160 pixels, 32768 colors**

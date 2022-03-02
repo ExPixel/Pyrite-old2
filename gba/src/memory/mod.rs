@@ -475,7 +475,7 @@ impl Memory for GbaMemory {
                 // range write the 8bit value to both the upper and lower bytes of the addressed
                 // halfword.
 
-                let obj_range = if self.ioregs.is_bitmap_mode() {
+                let obj_range = if self.ioregs.dispcnt.is_bitmap_mode() {
                     0x6014000..0x6018000
                 } else {
                     0x6010000..0x6018000

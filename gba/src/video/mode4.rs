@@ -10,7 +10,7 @@ pub fn render(
     vram: &[u8; VRAM_SIZE as usize],
 ) {
     let mut frame_line_start = line as usize * 240;
-    if ioregs.display_frame() == 1 {
+    if ioregs.dispcnt.frame() == 1 {
         frame_line_start += 0xA000;
     }
     let frame_line = &vram[frame_line_start..(frame_line_start + 240)];

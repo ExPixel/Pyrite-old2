@@ -40,12 +40,12 @@ impl Gba {
 
     pub fn frame(&mut self) {
         // wait until we are out of VBLANK
-        while self.mem.ioregs.vblank() {
+        while self.mem.ioregs.dispstat.vblank() {
             self.step();
         }
 
         // Wait until the end of the frame (enter VBLANK)
-        while !self.mem.ioregs.vblank() {
+        while !self.mem.ioregs.dispstat.vblank() {
             self.step();
         }
     }

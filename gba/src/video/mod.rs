@@ -31,7 +31,7 @@ impl GbaVideo {
     }
 
     fn enter_hdraw(&mut self, mem: &mut GbaMemory, late: Cycles) {
-        mem.ioregs.set_hblank(false);
+        mem.ioregs.dispstat.set_hblank(false);
         self.scheduler.schedule(
             |gba, late| gba.video.enter_hblank(&mut gba.mem, late),
             HDRAW_CYCLES - late,
@@ -41,13 +41,13 @@ impl GbaVideo {
     fn exit_hblank(&mut self, mem: &mut GbaMemory, late: Cycles) {
         mem.ioregs.vcount = match mem.ioregs.vcount {
             159 => {
-                mem.ioregs.set_vblank(true);
+                mem.ioregs.dispstat.set_vblank(true);
                 160
             }
 
             // VBLANK flag is NOT set during line 227
             226 => {
-                mem.ioregs.set_vblank(false);
+                mem.ioregs.dispstat.set_vblank(false);
                 227
             }
 
@@ -56,13 +56,14 @@ impl GbaVideo {
         };
 
         mem.ioregs
-            .set_vcount_match(mem.ioregs.vcount == mem.ioregs.vcount_setting());
+            .dispstat
+            .set_vcounter_match(mem.ioregs.vcount == mem.ioregs.dispstat.vcount_setting());
 
         self.enter_hdraw(mem, late);
     }
 
     fn enter_hblank(&mut self, mem: &mut GbaMemory, late: Cycles) {
-        mem.ioregs.set_hblank(true);
+        mem.ioregs.dispstat.set_hblank(true);
 
         let line = mem.ioregs.vcount;
 
@@ -82,7 +83,7 @@ impl GbaVideo {
     fn render_line(line: u16, output: &mut [u16], mem: &GbaMemory) {
         let mut buf = LineBuffer::default();
 
-        match mem.ioregs.bg_mode() {
+        match mem.ioregs.dispcnt.bg_mode() {
             3 => {
                 mode3::render(line, &mut buf, &mem.vram);
                 output.copy_from_slice(buf.bg(2));

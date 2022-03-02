@@ -1,7 +1,9 @@
 mod constants;
+mod types;
 
 use super::GbaMemory;
 pub use constants::*;
+pub use types::*;
 use util::bits::Bits as _;
 
 impl GbaMemory {
@@ -15,9 +17,9 @@ impl GbaMemory {
     pub(super) fn load16_io(&mut self, address: u32) -> u16 {
         match address {
             // LCD
-            DISPCNT => self.ioregs.dispcnt,
+            DISPCNT => self.ioregs.dispcnt.into(),
             GREENSWAP => self.ioregs.greenswap,
-            DISPSTAT => self.ioregs.dispstat,
+            DISPSTAT => self.ioregs.dispstat.into(),
             VCOUNT => self.ioregs.vcount,
             BG0CNT => self.ioregs.bgcnt[0],
             BG1CNT => self.ioregs.bgcnt[1],
@@ -51,9 +53,9 @@ impl GbaMemory {
     pub(super) fn store16_io(&mut self, address: u32, value: u16) {
         match address {
             // LCD
-            DISPCNT => self.ioregs.dispcnt = value,
+            DISPCNT => self.ioregs.dispcnt.set_preserve_bits(value),
             GREENSWAP => self.ioregs.greenswap = value,
-            DISPSTAT => self.ioregs.set_dispstat(value),
+            DISPSTAT => self.ioregs.dispstat.set_preserve_bits(value),
             VCOUNT => { /* NOP */ }
             BG0CNT => self.ioregs.bgcnt[0] = value,
             BG1CNT => self.ioregs.bgcnt[1] = value,
@@ -149,9 +151,9 @@ impl GbaMemory {
 #[derive(Default)]
 pub struct IoRegisters {
     // LCD
-    pub(crate) dispcnt: u16,
+    pub(crate) dispcnt: LCDControl,
     pub(crate) greenswap: u16,
-    pub(crate) dispstat: u16,
+    pub(crate) dispstat: LCDStatus,
     pub(crate) waitcnt: u16,
     pub(crate) vcount: u16,
     pub(crate) bldcnt: u16,
@@ -176,75 +178,12 @@ impl IoRegisters {
         set_preserve_bits(&mut self.waitcnt, value, 0x8000);
     }
 
-    pub fn dispcnt(&self) -> u16 {
+    pub fn dispcnt(&self) -> LCDControl {
         self.dispcnt
     }
 
-    pub fn set_dispcnt(&mut self, value: u16) {
+    pub fn set_dispcnt(&mut self, value: LCDControl) {
         self.dispcnt = value;
-    }
-
-    pub fn dispstat(&self) -> u16 {
-        self.dispstat
-    }
-
-    pub fn set_dispstat(&mut self, value: u16) {
-        set_preserve_bits(&mut self.dispstat, value, 0x0047);
-    }
-
-    pub fn vcount(&self) -> u16 {
-        self.vcount
-    }
-
-    pub fn vblank(&self) -> bool {
-        self.dispstat.is_bit_set(0)
-    }
-
-    pub(crate) fn set_vblank(&mut self, value: bool) {
-        self.dispstat = self.dispstat.replace_bit(0, value);
-    }
-
-    pub fn hblank(&self) -> bool {
-        self.dispstat.is_bit_set(1)
-    }
-
-    pub(crate) fn set_hblank(&mut self, value: bool) {
-        self.dispstat = self.dispstat.replace_bit(1, value);
-    }
-
-    pub fn vcount_match(&self) -> bool {
-        self.dispstat.is_bit_set(2)
-    }
-
-    pub(crate) fn set_vcount_match(&mut self, value: bool) {
-        self.dispstat = self.dispstat.replace_bit(2, value);
-    }
-
-    pub fn vcount_setting(&self) -> u16 {
-        self.dispstat >> 8
-    }
-
-    pub fn bg_mode(&self) -> u16 {
-        self.dispcnt & 0x7
-    }
-
-    pub fn is_bitmap_mode(&self) -> bool {
-        (3..6).contains(&self.bg_mode())
-    }
-
-    pub fn display_frame(&self) -> u16 {
-        self.dispcnt.bit(4)
-    }
-
-    pub fn screen_display_bg(&self, bg: u16) -> bool {
-        if bg > 3 {
-            return false;
-        }
-        self.dispcnt.is_bit_set(bg as u32 + 8)
-    }
-
-    pub fn screen_display_obj(&self) -> bool {
-        self.dispcnt.is_bit_set(12)
     }
 }
 

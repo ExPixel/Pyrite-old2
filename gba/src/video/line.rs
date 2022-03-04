@@ -23,4 +23,8 @@ impl LineBuffer {
     pub fn bg(&self, bg: usize) -> &[u16; 240] {
         &self.pixels[bg]
     }
+
+    pub fn bg_mut(&mut self, bg: usize) -> &mut [u16; 240] {
+        &mut self.pixels[bg]
+    }
 }

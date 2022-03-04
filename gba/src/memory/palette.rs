@@ -16,13 +16,21 @@ impl Default for Palette {
 }
 
 impl Palette {
-    pub fn get_bg256(&self, idx: u8) -> u16 {
-        self.view16((idx as u32) * 2)
+    pub fn get_bg256(&self, entry: u8) -> u16 {
+        self.view16((entry as u32) * 2)
     }
 
-    pub fn get_obj256(&self, idx: u8) -> u16 {
-        let addr = (idx as u32) * 2 + 0x200;
+    pub fn get_obj256(&self, entry: u8) -> u16 {
+        let addr = (entry as u32) * 2 + 0x200;
         self.view16(addr)
+    }
+
+    pub fn get_bg16(&self, palette: u8, entry: u8) -> u16 {
+        self.get_bg256(palette * 16 + entry)
+    }
+
+    pub fn get_obj16(&self, palette: u8, entry: u8) -> u16 {
+        self.get_obj256(palette * 16 + entry)
     }
 
     pub fn load32(&self, address: u32) -> u32 {

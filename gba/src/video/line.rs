@@ -114,10 +114,6 @@ impl LayerMetadata {
         (self.value & Self::PALETTE_4BPP) != 0
     }
 
-    pub fn is_8bpp(&self) -> bool {
-        (self.value & (Self::BITMAP_16BPP | Self::PALETTE_4BPP)) == 0
-    }
-
     pub fn set_bitmap(&mut self) {
         self.value |= Self::BITMAP_16BPP;
     }

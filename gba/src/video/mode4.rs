@@ -1,4 +1,4 @@
-use crate::memory::{io::IoRegisters, palette::Palette, VRAM_SIZE};
+use crate::memory::{io::IoRegisters, VRAM_SIZE};
 
 use super::line::LineBuffer;
 

@@ -1,6 +1,5 @@
 use crate::memory::{
     io::{BgControl, BgOffset},
-    palette::Palette,
     VRAM_SIZE,
 };
 use byteorder::{ByteOrder as _, LittleEndian as LE};
@@ -63,10 +62,10 @@ pub fn render_4bpp(
                 buf.put_4bpp(bgidx, dx + 3, palette, ((entries8 >> 16) & 0xF) as u8);
                 buf.put_4bpp(bgidx, dx + 2, palette, ((entries8 >> 20) & 0xF) as u8);
                 buf.put_4bpp(bgidx, dx + 1, palette, ((entries8 >> 24) & 0xF) as u8);
-                buf.put_4bpp(bgidx, dx + 0, palette, ((entries8 >> 28) & 0xF) as u8);
+                buf.put_4bpp(bgidx, dx, palette, ((entries8 >> 28) & 0xF) as u8);
             } else {
                 let dx = dx as usize;
-                buf.put_4bpp(bgidx, dx + 0, palette, (entries8 & 0xF) as u8);
+                buf.put_4bpp(bgidx, dx, palette, (entries8 & 0xF) as u8);
                 buf.put_4bpp(bgidx, dx + 1, palette, ((entries8 >> 4) & 0xF) as u8);
                 buf.put_4bpp(bgidx, dx + 2, palette, ((entries8 >> 8) & 0xF) as u8);
                 buf.put_4bpp(bgidx, dx + 3, palette, ((entries8 >> 12) & 0xF) as u8);

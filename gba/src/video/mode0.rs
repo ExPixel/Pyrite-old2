@@ -1,11 +1,10 @@
 use super::{line::LineBuffer, text};
-use crate::memory::{io::IoRegisters, palette::Palette, VRAM_SIZE};
+use crate::memory::{io::IoRegisters, VRAM_SIZE};
 
 pub fn render(
     line: u16,
     buf: &mut LineBuffer,
     ioregs: &IoRegisters,
-    palette: &Palette,
     vram: &[u8; VRAM_SIZE as usize],
 ) {
     for bg in 0..4 {
@@ -19,9 +18,9 @@ pub fn render(
         let bgofs = ioregs.bgofs[bg as usize];
 
         if bgcnt.palette_256() {
-            text::render_8bpp(line, bgcnt, bgofs, vram, palette);
+            log::debug!("render 8bpp")
         } else {
-            text::render_4bpp(buf, line, bg as usize, bgcnt, bgofs, vram, palette);
+            text::render_4bpp(buf, line, bg as usize, bgcnt, bgofs, vram);
         }
     }
 }

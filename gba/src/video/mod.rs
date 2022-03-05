@@ -86,22 +86,13 @@ impl GbaVideo {
         let mut buf = LineBuffer::default();
 
         match mem.ioregs.dispcnt.bg_mode() {
-            0 => {
-                mode0::render(line, &mut buf, &mem.ioregs, &mem.palette, &mem.vram);
-
-                // FIXME: temporary code to get the sbb_reg demo to display something:
-                output.copy_from_slice(buf.bg(0));
-            }
-            3 => {
-                mode3::render(line, &mut buf, &mem.vram);
-                output.copy_from_slice(buf.bg(2));
-            }
-            4 => {
-                mode4::render(line, &mut buf, &mem.ioregs, &mem.palette, &mem.vram);
-                output.copy_from_slice(buf.bg(2));
-            }
+            0 => mode0::render(line, &mut buf, &mem.ioregs, &mem.vram),
+            3 => mode3::render(line, &mut buf, &mem.vram),
+            4 => mode4::render(line, &mut buf, &mem.ioregs, &mem.vram),
             _ => {}
         }
+
+        buf.render(output, &mem.ioregs, &mem.palette);
     }
 
     pub fn screen(&self) -> &[u16; SCREEN_PIXEL_COUNT] {

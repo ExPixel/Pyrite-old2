@@ -223,6 +223,86 @@ register! {
     }
 }
 
+register! {
+    /// 4000050h - BLDCNT - Color Special Effects Selection (R/W)
+    ///   Bit   Expl.
+    ///   0     BG0 1st Target Pixel (Background 0)
+    ///   1     BG1 1st Target Pixel (Background 1)
+    ///   2     BG2 1st Target Pixel (Background 2)
+    ///   3     BG3 1st Target Pixel (Background 3)
+    ///   4     OBJ 1st Target Pixel (Top-most OBJ pixel)
+    ///   5     BD  1st Target Pixel (Backdrop)
+    ///   6-7   Color Special Effect (0-3, see below)
+    ///          0 = None                (Special effects disabled)
+    ///          1 = Alpha Blending      (1st+2nd Target mixed)
+    ///          2 = Brightness Increase (1st Target becomes whiter)
+    ///          3 = Brightness Decrease (1st Target becomes blacker)
+    ///   8     BG0 2nd Target Pixel (Background 0)
+    ///   9     BG1 2nd Target Pixel (Background 1)
+    ///   10    BG2 2nd Target Pixel (Background 2)
+    ///   11    BG3 2nd Target Pixel (Background 3)
+    ///   12    OBJ 2nd Target Pixel (Top-most OBJ pixel)
+    ///   13    BD  2nd Target Pixel (Backdrop)
+    ///   14-15 Not used
+    pub struct ColorSpecialEffects: u16 {
+        [6,7]   effect, set_effect: Effect,
+    }
+}
+
+impl ColorSpecialEffects {
+    pub fn is_first_target(&self, layer: usize) -> bool {
+        if layer > 5 {
+            return false;
+        }
+        self.value.is_bit_set(layer as _)
+    }
+
+    pub fn is_second_target(&self, layer: usize) -> bool {
+        if layer > 5 {
+            return false;
+        }
+        self.value.is_bit_set((layer + 8) as _)
+    }
+}
+
+register! {
+    /// 4000052h - BLDALPHA - Alpha Blending Coefficients (R/W) (not W)
+    /// Used for Color Special Effects Mode 1, and for Semi-Transparent OBJs.
+    ///   Bit   Expl.
+    ///   0-4   EVA Coefficient (1st Target) (0..16 = 0/16..16/16, 17..31=16/16)
+    ///   5-7   Not used
+    ///   8-12  EVB Coefficient (2nd Target) (0..16 = 0/16..16/16, 17..31=16/16)
+    ///   13-15 Not used
+    pub struct AlphaBlendingCoeff: u16 {}
+}
+
+impl AlphaBlendingCoeff {
+    pub fn eva_coeff(&self) -> u16 {
+        self.value.bits(0, 4).min(16)
+    }
+
+    pub fn evb_coeff(&self) -> u16 {
+        self.value.bits(8, 12).min(16)
+    }
+
+    pub fn set_eva_coeff(&mut self, eva_coeff: u16) {
+        self.value = self.value.replace_bits(0, 4, eva_coeff.min(16));
+    }
+
+    pub fn set_evb(&mut self, evb_coeff: u16) {
+        self.value = self.value.replace_bits(8, 12, evb_coeff.min(16));
+    }
+}
+
+util::primitive_enum! {
+    pub enum Effect: u16 {
+        None = 0,
+        AlphaBlending,
+        BrightnessIncrease,
+        BrightnessDecrease,
+    }
+}
+
 util::primitive_enum! {
     pub enum ObjCharVramMapping: u16 {
         TwoDimensional = 0,

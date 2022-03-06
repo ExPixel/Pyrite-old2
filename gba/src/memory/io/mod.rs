@@ -33,8 +33,8 @@ impl GbaMemory {
             BG2VOFS => self.ioregs.bgofs[2].y(),
             BG3HOFS => self.ioregs.bgofs[3].x(),
             BG3VOFS => self.ioregs.bgofs[3].y(),
-            BLDCNT => self.ioregs.bldcnt,
-            BLDALPHA => self.ioregs.bldalpha,
+            BLDCNT => self.ioregs.bldcnt.into(),
+            BLDALPHA => self.ioregs.bldalpha.into(),
             BLDY => self.ioregs.bldy,
 
             // Keypad Input
@@ -77,8 +77,8 @@ impl GbaMemory {
             BG2VOFS => self.ioregs.bgofs[2].set_y(value),
             BG3HOFS => self.ioregs.bgofs[3].set_x(value),
             BG3VOFS => self.ioregs.bgofs[3].set_y(value),
-            BLDCNT => self.ioregs.bldcnt = value,
-            BLDALPHA => self.ioregs.bldalpha = value,
+            BLDCNT => self.ioregs.bldcnt.set_preserve_bits(value),
+            BLDALPHA => self.ioregs.bldalpha.set_preserve_bits(value),
             BLDY => self.ioregs.bldy = value,
 
             // Keypad Input
@@ -172,8 +172,8 @@ pub struct IoRegisters {
     pub(crate) dispstat: LCDStatus,
     pub(crate) waitcnt: u16,
     pub(crate) vcount: u16,
-    pub(crate) bldcnt: u16,
-    pub(crate) bldalpha: u16,
+    pub(crate) bldcnt: ColorSpecialEffects,
+    pub(crate) bldalpha: AlphaBlendingCoeff,
     pub(crate) bldy: u16,
     pub(crate) bgcnt: [BgControl; 4],
     pub(crate) bgofs: [BgOffset; 4],

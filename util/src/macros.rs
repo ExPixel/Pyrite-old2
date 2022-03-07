@@ -65,7 +65,7 @@ macro_rules! bitfields {
             }
 
             pub fn set_preserve_bits(&mut self, value: $InnerType) {
-                set_preserve_bits(&mut self.value, value, Self::READONLY);
+                self.value = (value & !Self::READONLY) | (self.value & Self::READONLY)
             }
 
             $(

@@ -1,4 +1,3 @@
-use super::set_preserve_bits;
 use util::bitfields;
 use util::bits::Bits as _;
 
@@ -206,6 +205,12 @@ impl AlphaBlendingCoeff {
 
     pub fn set_evb(&mut self, evb_coeff: u16) {
         self.value = self.value.replace_bits(8, 12, evb_coeff.min(16));
+    }
+}
+
+bitfields! {
+    pub struct WaitstateControl: u16 {
+        readonly = 0x8000
     }
 }
 

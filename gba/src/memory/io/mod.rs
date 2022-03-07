@@ -40,7 +40,7 @@ impl GbaMemory {
             // Keypad Input
             KEYINPUT => self.ioregs.keyinput,
 
-            WAITCNT => self.ioregs.waitcnt,
+            WAITCNT => self.ioregs.waitcnt.into(),
             _ => {
                 log::warn!("attempted to read from unused IO address 0x{:08X}", address);
                 0
@@ -85,7 +85,7 @@ impl GbaMemory {
             KEYINPUT => { /*NOP */ }
 
             WAITCNT => {
-                self.ioregs.set_waitcnt(value);
+                self.ioregs.waitcnt.set_preserve_bits(value);
                 self.update_waitcnt();
             }
 
@@ -147,7 +147,7 @@ impl GbaMemory {
         const WS2_NONSEQ_VALUES: [u8; 4] = [3, 2, 1, 7];
         const WS2_SEQ_VALUES: [u8; 2] = [7, 0];
 
-        let waitcnt = self.ioregs.waitcnt;
+        let waitcnt = self.ioregs.waitcnt.value;
 
         self.sram_waitstates = SRAM_WAIT_VALUES[waitcnt.bits(0, 1) as usize].into();
 
@@ -170,7 +170,7 @@ pub struct IoRegisters {
     pub(crate) dispcnt: LCDControl,
     pub(crate) greenswap: u16,
     pub(crate) dispstat: LCDStatus,
-    pub(crate) waitcnt: u16,
+    pub(crate) waitcnt: WaitstateControl,
     pub(crate) vcount: u16,
     pub(crate) bldcnt: ColorSpecialEffects,
     pub(crate) bldalpha: AlphaBlendingCoeff,
@@ -186,30 +186,4 @@ impl IoRegisters {
     pub fn init(&mut self) {
         self.keyinput = 0x3ff;
     }
-
-    pub fn waitcnt(&self) -> u16 {
-        self.waitcnt
-    }
-
-    pub fn set_waitcnt(&mut self, value: u16) {
-        set_preserve_bits(&mut self.waitcnt, value, 0x8000);
-    }
-
-    pub fn dispcnt(&self) -> LCDControl {
-        self.dispcnt
-    }
-
-    pub fn set_dispcnt(&mut self, value: LCDControl) {
-        self.dispcnt = value;
-    }
-}
-
-fn set_preserve_bits<T>(dst: &mut T, src: T, readonly_mask: T)
-where
-    T: Copy
-        + std::ops::BitOr<Output = T>
-        + std::ops::BitAnd<Output = T>
-        + std::ops::Not<Output = T>,
-{
-    *dst = (src & !readonly_mask) | (*dst & readonly_mask);
 }

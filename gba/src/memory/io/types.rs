@@ -1,93 +1,8 @@
 use super::set_preserve_bits;
+use util::bitfields;
 use util::bits::Bits as _;
 
-macro_rules! register {
-    (
-        $(#[$meta:meta])* $visibility:vis
-        struct $Name:ident: $InnerType:ident {
-            $( [$field_start:literal$(, $field_end:literal)?] $field_get:ident, $field_set:ident: $FieldType:ident ),* $(,)?
-            $( readonly = $readonly:expr  $(,)?)?
-        }
-    ) => {
-        $(#[$meta])*
-        #[derive(Default, Copy, Clone, PartialEq, Eq, Debug)]
-        $visibility struct $Name {
-            pub value: $InnerType,
-        }
-
-        impl $Name {
-            pub const READONLY: $InnerType = 0 $(| $readonly)?;
-
-            pub const fn new(inner_value: $InnerType) -> Self {
-                $Name { value: inner_value }
-            }
-
-            pub fn set_preserve_bits(&mut self, value: $InnerType) {
-                set_preserve_bits(&mut self.value, value, Self::READONLY);
-            }
-
-            $(
-                pub fn $field_get(&self) -> $FieldType {
-                    let bits = extract_bits!(self.value, $field_start $(, $field_end)?);
-                    from_bits!(bits, $InnerType, $FieldType)
-                }
-
-                pub fn $field_set(&mut self, value: $FieldType) {
-                    let new_bits = <$InnerType>::from(value);
-                    self.value = replace_bits!(self.value, new_bits, $field_start $(, $field_end)?);
-                }
-            )*
-        }
-
-        impl From<$InnerType> for $Name {
-            fn from(inner_value: $InnerType) -> $Name {
-                $Name { value: inner_value }
-            }
-        }
-
-        impl From<$Name> for $InnerType {
-            fn from(v: $Name) -> $InnerType {
-                v.value
-            }
-        }
-    };
-}
-
-macro_rules! extract_bits {
-    ($value:expr, $start:expr) => {
-        $value.bits($start, $start)
-    };
-
-    ($value:expr, $start:expr, $end:expr) => {
-        $value.bits($start, $end)
-    };
-}
-
-macro_rules! replace_bits {
-    ($dst:expr, $src:expr, $start:expr) => {
-        $dst.replace_bits($start, $start, $src)
-    };
-
-    ($dst:expr, $src:expr, $start:expr, $end:expr) => {
-        $dst.replace_bits($start, $end, $src)
-    };
-}
-
-macro_rules! from_bits {
-    ($bits:expr, u32, u16) => {
-        $bits as u16
-    };
-
-    ($bits:expr, $SrcType:ty, bool) => {
-        $bits != 0
-    };
-
-    ($bits:expr, $SrcType:ty, $DstType:ty) => {
-        <$DstType as From<$SrcType>>::from($bits)
-    };
-}
-
-register! {
+bitfields! {
     /// **4000000h - DISPCNT - LCD Control (Read/Write)**
     /// 0-2   BG Mode                (0-5=Video Mode 0-5, 6-7=Prohibited)
     /// 3     Reserved / CGB Mode    (0=GBA, 1=CGB; can be set only by BIOS opcodes)
@@ -131,7 +46,7 @@ impl LCDControl {
     }
 }
 
-register! {
+bitfields! {
     /// **4000004h - DISPSTAT - General LCD Status (Read/Write)**
     /// Display status and Interrupt control. The H-Blank conditions are generated once per scanline, including for the 'hidden' scanlines during V-Blank.
     /// Bit   Expl.
@@ -157,7 +72,7 @@ register! {
     }
 }
 
-register! {
+bitfields! {
     /// **4000008h - BG0CNT - BG0 Control (R/W) (BG Modes 0,1 only)**
     /// **400000Ah - BG1CNT - BG1 Control (R/W) (BG Modes 0,1 only)**
     /// **400000Ch - BG2CNT - BG2 Control (R/W) (BG Modes 0,1,2 only)**
@@ -216,14 +131,14 @@ impl BgControl {
     }
 }
 
-register! {
+bitfields! {
     pub struct BgOffset: u32 {
         [0,8]   x, set_x: u16,
         [16,24] y, set_y: u16,
     }
 }
 
-register! {
+bitfields! {
     /// 4000050h - BLDCNT - Color Special Effects Selection (R/W)
     ///   Bit   Expl.
     ///   0     BG0 1st Target Pixel (Background 0)
@@ -265,7 +180,7 @@ impl ColorSpecialEffects {
     }
 }
 
-register! {
+bitfields! {
     /// 4000052h - BLDALPHA - Alpha Blending Coefficients (R/W) (not W)
     /// Used for Color Special Effects Mode 1, and for Semi-Transparent OBJs.
     ///   Bit   Expl.

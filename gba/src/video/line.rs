@@ -183,9 +183,23 @@ impl LineBuffer {
                 }
             }
 
-            Effect::None => unreachable!(),
+            Effect::BrightnessIncrease => {
+                //  For each pixel each R, G, B intensities are calculated separately:
+                //   I = I1st + (31-I1st)*EVY   ;For Brightness Increase
+                // The color intensities of any selected 1st target surface(s) are increased by using the parameter in BLDY register.
+                let evy = ioregs.bldy.evy_coeff();
+                brightness_increase(colors.0, evy)
+            }
 
-            _ => colors.0,
+            Effect::BrightnessDecrease => {
+                //  For each pixel each R, G, B intensities are calculated separately:
+                //   I = I1st - (I1st)*EVY      ;For Brightness Decrease
+                // The color intensities of any selected 1st target surface(s) are decreased by using the parameter in BLDY register.
+                let evy = ioregs.bldy.evy_coeff();
+                brightness_decrease(colors.0, evy)
+            }
+
+            Effect::None => unreachable!(),
         }
     }
 }
@@ -197,6 +211,24 @@ fn alpha_blend(c1: u16, c2: u16, eva: u16, evb: u16) -> u16 {
     let r = (r1 * eva + r2 * evb) / 16;
     let g = (g1 * eva + g2 * evb) / 16;
     let b = (b1 * eva + b2 * evb) / 16;
+    recompose(r, g, b)
+}
+
+fn brightness_increase(c: u16, evy: u16) -> u16 {
+    let (r, g, b) = decompose(c);
+    //   I = I1st + (31-I1st)*EVY
+    let r = r + (((31 - r) * evy) / 16);
+    let g = g + (((31 - g) * evy) / 16);
+    let b = b + (((31 - b) * evy) / 16);
+    recompose(r, g, b)
+}
+
+fn brightness_decrease(c: u16, evy: u16) -> u16 {
+    let (r, g, b) = decompose(c);
+    //   I = I1st - (I1st)*EVY
+    let r = r + ((r * evy) / 16);
+    let g = g + ((g * evy) / 16);
+    let b = b + ((b * evy) / 16);
     recompose(r, g, b)
 }
 

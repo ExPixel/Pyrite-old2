@@ -209,6 +209,24 @@ impl AlphaBlendingCoeff {
 }
 
 bitfields! {
+    /// 4000054h - BLDY - Brightness (Fade-In/Out) Coefficient (W) (not R/W)
+    /// Used for Color Special Effects Modes 2 and 3.
+    /// Bit   Expl.
+    /// 0-4   EVY Coefficient (Brightness) (0..16 = 0/16..16/16, 17..31=16/16)
+    pub struct BrightnessCoeff: u16 {}
+}
+
+impl BrightnessCoeff {
+    pub fn evy_coeff(&self) -> u16 {
+        self.value.bits(0, 4).min(16)
+    }
+
+    pub fn set_evy_coeff(&mut self, evy_coeff: u16) {
+        self.value = self.value.replace_bits(0, 4, evy_coeff.min(16));
+    }
+}
+
+bitfields! {
     pub struct WaitstateControl: u16 {
         readonly = 0x8000
     }

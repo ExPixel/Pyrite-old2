@@ -1,7 +1,7 @@
 use util::bits::Bits as _;
 
 use crate::memory::{
-    io::{Effect, IoRegisters},
+    io::{AlphaBlendingCoeff, BrightnessCoeff, Effect, IoRegisters},
     palette::Palette,
 };
 
@@ -143,15 +143,23 @@ impl LineBuffer {
             }
         }
 
+        let effect = ioregs.bldcnt.effect();
+        let bldalpha = ioregs.bldalpha;
+        let bldy = ioregs.bldy;
+
         (0..240)
-            .map(|x| (x, self.render_pixel(pixels[x], ioregs)))
+            .map(|x| (x, self.render_pixel(pixels[x], effect, bldalpha, bldy)))
             .for_each(|(x, p)| output[x] = p);
     }
 
-    fn render_pixel(&self, pixel: Pixel, ioregs: &IoRegisters) -> u16 {
+    fn render_pixel(
+        &self,
+        pixel: Pixel,
+        mut effect: Effect,
+        bldalpha: AlphaBlendingCoeff,
+        bldy: BrightnessCoeff,
+    ) -> u16 {
         let Pixel { mut attrs, colors } = pixel;
-
-        let mut effect = ioregs.bldcnt.effect();
 
         // OBJs that are defined as 'Semi-Transparent' in OAM memory are always selected as 1st Target (regardless of BLDCNT Bit 4),
         // and are always using Alpha Blending mode (regardless of BLDCNT Bit 6-7).
@@ -180,8 +188,8 @@ impl LineBuffer {
                 // pixel is moved between the two targets, or if 2nd target has higher display priority than 1st target -
                 // then only the top-most pixel is displayed (at normal intensity, regardless of BLDALPHA).
                 if attrs.1.is_second_target() {
-                    let eva = ioregs.bldalpha.eva_coeff();
-                    let evb = ioregs.bldalpha.evb_coeff();
+                    let eva = bldalpha.eva_coeff();
+                    let evb = bldalpha.evb_coeff();
                     alpha_blend(colors.0, colors.1, eva, evb)
                 } else {
                     colors.0
@@ -192,7 +200,7 @@ impl LineBuffer {
                 //  For each pixel each R, G, B intensities are calculated separately:
                 //   I = I1st + (31-I1st)*EVY   ;For Brightness Increase
                 // The color intensities of any selected 1st target surface(s) are increased by using the parameter in BLDY register.
-                let evy = ioregs.bldy.evy_coeff();
+                let evy = bldy.evy_coeff();
                 brightness_increase(colors.0, evy)
             }
 
@@ -200,7 +208,7 @@ impl LineBuffer {
                 //  For each pixel each R, G, B intensities are calculated separately:
                 //   I = I1st - (I1st)*EVY      ;For Brightness Decrease
                 // The color intensities of any selected 1st target surface(s) are decreased by using the parameter in BLDY register.
-                let evy = ioregs.bldy.evy_coeff();
+                let evy = bldy.evy_coeff();
                 brightness_decrease(colors.0, evy)
             }
 

@@ -20,7 +20,7 @@ pub fn render_4bpp(
     pub const BYTES_PER_TILE: usize = 32;
     pub const BYTES_PER_LINE: usize = 4;
 
-    buf.layer_metadata_mut(bgidx).set_4bpp();
+    buf.layer_attrs_mut(bgidx).set_4bpp();
 
     // FIXME implement mosaic.
     let mosaic_x = 0;

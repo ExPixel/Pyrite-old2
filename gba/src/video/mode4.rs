@@ -8,7 +8,7 @@ pub fn render(
     ioregs: &IoRegisters,
     vram: &[u8; VRAM_SIZE as usize],
 ) {
-    buf.layer_metadata_mut(2).set_8bpp();
+    buf.layer_attrs_mut(2).set_8bpp();
 
     let mut frame_line_start = line as usize * 240;
     if ioregs.dispcnt.frame() == 1 {

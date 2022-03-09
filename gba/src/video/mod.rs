@@ -2,6 +2,7 @@ mod line;
 mod mode0;
 mod mode3;
 mod mode4;
+mod obj;
 mod text;
 
 use arm::Cycles;
@@ -90,6 +91,10 @@ impl GbaVideo {
             3 => mode3::render(line, &mut buf, &mem.vram),
             4 => mode4::render(line, &mut buf, &mem.ioregs, &mem.vram),
             _ => {}
+        }
+
+        if mem.ioregs.dispcnt.display_obj() {
+            obj::render(line, &mut buf, &mem.ioregs, &mem.oam, &mem.vram);
         }
 
         buf.render(output, &mem.ioregs, &mem.palette);

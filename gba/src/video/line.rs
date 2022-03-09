@@ -11,14 +11,14 @@ pub const BACKDROP: usize = 5;
 pub struct LineBuffer {
     // 240 pixels for each background (BG0-3 + OBJ)
     pixels: [[u16; 240]; 5],
-    layer_metadata: [LayerMetadata; 5],
+    layer_attrs: [LayerAttrs; 5],
 }
 
 impl Default for LineBuffer {
     fn default() -> Self {
         LineBuffer {
             pixels: [[0; 240]; 5],
-            layer_metadata: [LayerMetadata::default(); 5],
+            layer_attrs: [LayerAttrs::default(); 5],
         }
     }
 }
@@ -27,6 +27,21 @@ impl LineBuffer {
     pub(crate) fn put(&mut self, layer: usize, x: usize, pixel: u16) {
         self.pixels[layer][x] = pixel | 0x8000;
     }
+
+    pub(crate) fn put_obj_4bpp(&mut self, attrs: PixelAttrs, x: usize, palette: u8, entry: u8) {
+        self.pixels[OBJ][x] =
+            (attrs.value as u16) | ((palette as u16) << 12) | ((entry as u16) << 8);
+    }
+
+    pub(crate) fn put_obj_8bpp(&mut self, attrs: PixelAttrs, x: usize, entry: u8) {
+        self.pixels[OBJ][x] = attrs.value as u16 | ((entry as u16) << 8);
+    }
+
+    pub(crate) fn obj_pixel_attrs(&self, x: usize) -> PixelAttrs {
+        let value = self.pixels[OBJ][x] as u8;
+        PixelAttrs { value }
+    }
+
     pub(crate) fn put_4bpp(&mut self, layer: usize, x: usize, palette: u8, entry: u8) {
         self.pixels[layer][x] = ((palette as u16) << 4) | (entry as u16);
     }
@@ -35,34 +50,55 @@ impl LineBuffer {
         self.pixels[layer][x] = entry as u16;
     }
 
-    pub(crate) fn layer_metadata_mut(&mut self, layer: usize) -> &mut LayerMetadata {
-        &mut self.layer_metadata[layer]
+    pub(crate) fn layer_attrs_mut(&mut self, layer: usize) -> &mut LayerAttrs {
+        &mut self.layer_attrs[layer]
     }
 
-    fn color(&self, layer: usize, x: usize, palette: &Palette) -> Option<u16> {
-        let metadata = self.layer_metadata[layer];
-        let entry = self.pixels[layer][x];
+    fn color_obj(&self, x: usize, priority: u16, palette: &Palette) -> Option<(u16, PixelAttrs)> {
+        let entry = self.pixels[OBJ][x];
+        let attrs = PixelAttrs { value: entry as u8 };
 
-        if metadata.is_bitmap() {
-            return Some(entry);
+        if attrs.priority() != priority {
+            return None;
         }
 
-        if metadata.is_4bpp() {
+        let entry = (entry >> 8) as u8;
+
+        if attrs.is_4bpp() {
             let color_entry = entry & 0xF;
             if color_entry == 0 {
                 return None;
             }
             let palette_index = entry >> 4;
+            Some((
+                palette.get_obj16(palette_index as _, color_entry as _),
+                attrs,
+            ))
+        } else if entry as u8 == 0 {
+            None
+        } else {
+            Some((palette.get_obj256(entry), attrs))
+        }
+    }
 
-            if layer == OBJ {
-                Some(palette.get_obj16(palette_index as _, color_entry as _))
-            } else {
-                Some(palette.get_bg16(palette_index as _, color_entry as _))
+    fn color_bg(&self, layer: usize, x: usize, palette: &Palette) -> Option<u16> {
+        let attrs = self.layer_attrs[layer];
+        let entry = self.pixels[layer][x];
+
+        if attrs.is_bitmap() {
+            return Some(entry);
+        }
+
+        if attrs.is_4bpp() {
+            let color_entry = entry & 0xF;
+            if color_entry == 0 {
+                return None;
             }
+            let palette_index = (entry >> 4) & 0xF;
+
+            Some(palette.get_bg16(palette_index as _, color_entry as _))
         } else if entry == 0 {
             None
-        } else if layer == OBJ {
-            Some(palette.get_obj256(entry as _))
         } else {
             Some(palette.get_bg256(entry as _))
         }
@@ -83,17 +119,14 @@ impl LineBuffer {
         backdrop: u16,
         palette: &Palette,
     ) -> u16 {
-        const FIRST_TARGET: u8 = 0x1;
-        const SECOND_TARGET: u8 = 0x2;
-
-        let mut attrs = (0u8, 0u8);
+        let mut attrs = (PixelAttrs::default(), PixelAttrs::default());
         let mut colors = (backdrop, 0);
 
         if ioregs.bldcnt.is_first_target(BACKDROP) {
-            attrs.0 |= FIRST_TARGET;
+            attrs.0.set_first_target();
         }
         if ioregs.bldcnt.is_second_target(BACKDROP) {
-            attrs.0 |= SECOND_TARGET;
+            attrs.0.set_second_target();
         }
 
         for priority in (0..4).rev() {
@@ -103,14 +136,15 @@ impl LineBuffer {
                     continue;
                 }
 
-                if let Some(color) = self.color(bg, x, palette) {
-                    let mut new_attrs = 0;
+                if let Some(color) = self.color_bg(bg, x, palette) {
+                    let mut new_attrs = PixelAttrs::default();
                     if ioregs.bldcnt.is_first_target(bg) {
-                        new_attrs |= FIRST_TARGET;
+                        new_attrs.set_first_target();
                     }
                     if ioregs.bldcnt.is_second_target(bg) {
-                        new_attrs |= SECOND_TARGET;
+                        new_attrs.set_second_target();
                     }
+
                     attrs.1 = attrs.0;
                     attrs.0 = new_attrs;
 
@@ -118,7 +152,16 @@ impl LineBuffer {
                     colors.0 = color;
                 }
             }
-            // FIXME add OBJ pixel here :)
+
+            if ioregs.dispcnt.display_obj() {
+                if let Some((color, new_attrs)) = self.color_obj(x, priority, palette) {
+                    attrs.1 = attrs.0;
+                    attrs.0 = new_attrs;
+
+                    colors.1 = colors.0;
+                    colors.0 = color;
+                }
+            }
         }
 
         let effect = ioregs.bldcnt.effect();
@@ -136,7 +179,7 @@ impl LineBuffer {
                 // Otherwise - for example, if only one target exists, or if a non-transparent non-2nd-target
                 // pixel is moved between the two targets, or if 2nd target has higher display priority than 1st target -
                 // then only the top-most pixel is displayed (at normal intensity, regardless of BLDALPHA).
-                if (attrs.0 & FIRST_TARGET) != 0 && (attrs.1 & SECOND_TARGET) != 0 {
+                if attrs.0.is_first_target() && attrs.1.is_second_target() {
                     let eva = ioregs.bldalpha.eva_coeff();
                     let evb = ioregs.bldalpha.evb_coeff();
                     alpha_blend(colors.0, colors.1, eva, evb)
@@ -174,11 +217,11 @@ fn recompose(r: u16, g: u16, b: u16) -> u16 {
 }
 
 #[derive(Clone, Copy, Default)]
-pub(crate) struct LayerMetadata {
+pub(crate) struct LayerAttrs {
     value: u8,
 }
 
-impl LayerMetadata {
+impl LayerAttrs {
     const BITMAP_16BPP: u8 = 0x1;
     const PALETTE_4BPP: u8 = 0x2;
 
@@ -203,4 +246,57 @@ impl LayerMetadata {
     }
 }
 
-// struct PixelMetadata {}
+#[derive(Clone, Copy, Default)]
+pub(crate) struct PixelAttrs {
+    value: u8,
+}
+
+impl PixelAttrs {
+    const FIRST_TARGET: u8 = 0x1;
+    const SECOND_TARGET: u8 = 0x2;
+    const PALETTE_4BPP: u8 = 0x4;
+
+    pub fn is_first_target(&self) -> bool {
+        (self.value & Self::FIRST_TARGET) != 0
+    }
+
+    pub fn is_second_target(&self) -> bool {
+        (self.value & Self::SECOND_TARGET) != 0
+    }
+
+    pub fn set_first_target(&mut self) {
+        self.value |= Self::FIRST_TARGET;
+    }
+
+    pub fn set_second_target(&mut self) {
+        self.value |= Self::SECOND_TARGET;
+    }
+
+    /// Only used by OBJ layer pixels
+    pub fn is_4bpp(&self) -> bool {
+        (self.value & Self::PALETTE_4BPP) != 0
+    }
+
+    /// Only used by OBJ layer pixels
+    pub fn is_8bpp(&self) -> bool {
+        !self.is_4bpp()
+    }
+
+    /// Only used by OBJ layer pixels
+    pub fn set_4bpp(&mut self) {
+        self.value |= Self::PALETTE_4BPP;
+    }
+
+    /// Only used by OBJ layer pixels
+    pub fn set_8bpp(&mut self) {
+        /* NOP */
+    }
+
+    pub fn set_priority(&mut self, priority: u16) {
+        self.value |= ((priority as u8) << 6);
+    }
+
+    pub fn priority(&self) -> u16 {
+        (self.value >> 6) as u16
+    }
+}

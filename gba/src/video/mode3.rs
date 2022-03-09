@@ -17,7 +17,7 @@ use super::line::LineBuffer;
 /// The background occupies 75 KBytes (06000000-06012BFF), most of the 80 Kbytes BG area,
 /// not allowing to redraw an invisible second frame in background, so this mode is mostly recommended for still images only.
 pub fn render(line: u16, buf: &mut LineBuffer, vram: &[u8; VRAM_SIZE as usize]) {
-    buf.layer_metadata_mut(2).set_bitmap();
+    buf.layer_attrs_mut(2).set_bitmap();
 
     let vstart = 480 * line as usize;
     for x in 0..240 {

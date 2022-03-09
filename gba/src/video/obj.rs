@@ -154,6 +154,9 @@ pub fn render(
         if ioregs.bldcnt.is_second_target(OBJ) {
             attrs.set_second_target();
         }
+        if attr0.mode() == ObjMode::SemiTransparent {
+            attrs.set_semi_transparent();
+        }
 
         // TODO: Implement mosaic
         let mosaic_x = 0;

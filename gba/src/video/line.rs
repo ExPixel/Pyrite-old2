@@ -159,8 +159,21 @@ impl LineBuffer {
             }
         }
 
-        let effect = ioregs.bldcnt.effect();
-        if effect == Effect::None {
+        let mut effect = ioregs.bldcnt.effect();
+
+        // OBJs that are defined as 'Semi-Transparent' in OAM memory are always selected as 1st Target (regardless of BLDCNT Bit 4),
+        // and are always using Alpha Blending mode (regardless of BLDCNT Bit 6-7).
+        // The BLDCNT register may be used to perform Brightness effects on the OBJ (and/or other BG/BD layers).
+        // However, if a semi-transparent OBJ pixel does overlap a 2nd target pixel, then semi-transparency becomes priority,
+        // and the brightness effect will not take place (neither on 1st, nor 2nd target).
+        if attrs.0.is_semi_transparent() {
+            attrs.0.set_first_target();
+            if attrs.1.is_second_target() {
+                effect = Effect::AlphaBlending;
+            }
+        }
+
+        if effect == Effect::None || !attrs.0.is_first_target() {
             return colors.0;
         }
 
@@ -174,7 +187,7 @@ impl LineBuffer {
                 // Otherwise - for example, if only one target exists, or if a non-transparent non-2nd-target
                 // pixel is moved between the two targets, or if 2nd target has higher display priority than 1st target -
                 // then only the top-most pixel is displayed (at normal intensity, regardless of BLDALPHA).
-                if attrs.0.is_first_target() && attrs.1.is_second_target() {
+                if attrs.1.is_second_target() {
                     let eva = ioregs.bldalpha.eva_coeff();
                     let evb = ioregs.bldalpha.evb_coeff();
                     alpha_blend(colors.0, colors.1, eva, evb)
@@ -279,9 +292,12 @@ pub(crate) struct PixelAttrs {
 }
 
 impl PixelAttrs {
-    const FIRST_TARGET: u8 = 0x1;
-    const SECOND_TARGET: u8 = 0x2;
-    const PALETTE_4BPP: u8 = 0x4;
+    // # NOTE Bits 6 and 7 are used for priority
+
+    const FIRST_TARGET: u8 = 0x1; // bit 0
+    const SECOND_TARGET: u8 = 0x2; // bit 1
+    const PALETTE_4BPP: u8 = 0x4; // bit 2
+    const SEMI_TRANSPARENT: u8 = 0x8; // bit 3
 
     pub fn is_first_target(&self) -> bool {
         (self.value & Self::FIRST_TARGET) != 0
@@ -312,6 +328,14 @@ impl PixelAttrs {
     /// Only used by OBJ layer pixels
     pub fn set_8bpp(&mut self) {
         /* NOP */
+    }
+
+    pub fn set_semi_transparent(&mut self) {
+        self.value |= Self::SEMI_TRANSPARENT;
+    }
+
+    pub fn is_semi_transparent(&self) -> bool {
+        (self.value & Self::SEMI_TRANSPARENT) != 0
     }
 
     pub fn set_priority(&mut self, priority: u16) {

@@ -107,16 +107,46 @@ impl GbaMemory {
         self.store16_io(address, value16)
     }
 
-    pub(super) fn view32_io(&self, _address: u32) -> u32 {
-        todo!("view32_io")
+    pub(super) fn view32_io(&self, address: u32) -> u32 {
+        let lo = self.view16_io(address) as u32;
+        let hi = self.view16_io(address + 2) as u32;
+
+        lo | (hi << 16)
     }
 
-    pub(super) fn view16_io(&self, _address: u32) -> u16 {
-        todo!("view16_io")
+    pub(super) fn view16_io(&self, address: u32) -> u16 {
+        match address {
+            // LCD
+            DISPCNT => self.ioregs.dispcnt.into(),
+            GREENSWAP => self.ioregs.greenswap,
+            DISPSTAT => self.ioregs.dispstat.into(),
+            VCOUNT => self.ioregs.vcount,
+            BG0CNT => self.ioregs.bgcnt[0].into(),
+            BG1CNT => self.ioregs.bgcnt[1].into(),
+            BG2CNT => self.ioregs.bgcnt[2].into(),
+            BG3CNT => self.ioregs.bgcnt[3].into(),
+            BG0HOFS => self.ioregs.bgofs[0].x(),
+            BG0VOFS => self.ioregs.bgofs[0].y(),
+            BG1HOFS => self.ioregs.bgofs[1].x(),
+            BG1VOFS => self.ioregs.bgofs[1].y(),
+            BG2HOFS => self.ioregs.bgofs[2].x(),
+            BG2VOFS => self.ioregs.bgofs[2].y(),
+            BG3HOFS => self.ioregs.bgofs[3].x(),
+            BG3VOFS => self.ioregs.bgofs[3].y(),
+            BLDCNT => self.ioregs.bldcnt.into(),
+            BLDALPHA => self.ioregs.bldalpha.into(),
+            BLDY => self.ioregs.bldy,
+
+            // Keypad Input
+            KEYINPUT => self.ioregs.keyinput,
+
+            WAITCNT => self.ioregs.waitcnt.into(),
+            _ => 0,
+        }
     }
 
-    pub(super) fn view8_io(&self, _address: u32) -> u8 {
-        todo!("view8_io")
+    pub(super) fn view8_io(&self, address: u32) -> u8 {
+        (self.view16_io(address) >> ((address & 1) * 8)) as u8
     }
 
     pub(super) fn update_waitcnt(&mut self) {

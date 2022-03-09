@@ -100,29 +100,17 @@ impl LineBuffer {
     }
 
     pub fn render(&self, output: &mut [u16], ioregs: &IoRegisters, palette: &Palette) {
-        let backdrop = palette.get_bg256(0) | 0x8000;
-
-        (0..240)
-            .map(|x| (x, self.render_pixel(x, ioregs, backdrop, palette)))
-            .for_each(|(x, p)| output[x] = p);
-    }
-
-    fn render_pixel(
-        &self,
-        x: usize,
-        ioregs: &IoRegisters,
-        backdrop: u16,
-        palette: &Palette,
-    ) -> u16 {
-        let mut attrs = (PixelAttrs::default(), PixelAttrs::default());
-        let mut colors = (backdrop, 0);
-
+        let backdrop_color = palette.get_bg256(0) | 0x8000;
+        let mut backdrop_attrs = PixelAttrs::default();
         if ioregs.bldcnt.is_first_target(BACKDROP) {
-            attrs.0.set_first_target();
+            backdrop_attrs.set_first_target();
         }
         if ioregs.bldcnt.is_second_target(BACKDROP) {
-            attrs.0.set_second_target();
+            backdrop_attrs.set_second_target();
         }
+        let mut backdrop = Pixel::default();
+        backdrop.push(backdrop_color, backdrop_attrs);
+        let mut pixels = [backdrop; 240];
 
         for priority in (0..4).rev() {
             for bg in (0usize..4).rev() {
@@ -131,33 +119,37 @@ impl LineBuffer {
                     continue;
                 }
 
-                if let Some(color) = self.color_bg(bg, x, palette) {
-                    let mut new_attrs = PixelAttrs::default();
-                    if ioregs.bldcnt.is_first_target(bg) {
-                        new_attrs.set_first_target();
-                    }
-                    if ioregs.bldcnt.is_second_target(bg) {
-                        new_attrs.set_second_target();
-                    }
-
-                    attrs.1 = attrs.0;
-                    attrs.0 = new_attrs;
-
-                    colors.1 = colors.0;
-                    colors.0 = color;
+                let mut attrs = PixelAttrs::default();
+                if ioregs.bldcnt.is_first_target(bg) {
+                    attrs.set_first_target();
                 }
+                if ioregs.bldcnt.is_second_target(bg) {
+                    attrs.set_second_target();
+                }
+
+                (0..240).for_each(|x| {
+                    if let Some(color) = self.color_bg(bg, x, palette) {
+                        pixels[x].push(color, attrs);
+                    }
+                });
             }
 
             if ioregs.dispcnt.display_obj() {
-                if let Some((color, new_attrs)) = self.color_obj(x, priority, palette) {
-                    attrs.1 = attrs.0;
-                    attrs.0 = new_attrs;
-
-                    colors.1 = colors.0;
-                    colors.0 = color;
-                }
+                (0..240).for_each(|x| {
+                    if let Some((color, attrs)) = self.color_obj(x, priority, palette) {
+                        pixels[x].push(color, attrs);
+                    }
+                });
             }
         }
+
+        (0..240)
+            .map(|x| (x, self.render_pixel(pixels[x], ioregs)))
+            .for_each(|(x, p)| output[x] = p);
+    }
+
+    fn render_pixel(&self, pixel: Pixel, ioregs: &IoRegisters) -> u16 {
+        let Pixel { mut attrs, colors } = pixel;
 
         let mut effect = ioregs.bldcnt.effect();
 
@@ -214,6 +206,22 @@ impl LineBuffer {
 
             Effect::None => unreachable!(),
         }
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+struct Pixel {
+    attrs: (PixelAttrs, PixelAttrs),
+    colors: (u16, u16),
+}
+
+impl Pixel {
+    pub fn push(&mut self, color: u16, attrs: PixelAttrs) {
+        self.colors.1 = self.colors.0;
+        self.colors.0 = color;
+
+        self.attrs.1 = self.attrs.0;
+        self.attrs.0 = attrs;
     }
 }
 

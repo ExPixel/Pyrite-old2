@@ -301,7 +301,8 @@ impl Memory for GbaMemory {
                 de_assign!(value, wait, self.load32_gamepak(address, 2, access))
             }
             REGION_SRAM => de_assign!(value, wait, self.load32_sram(address, access)),
-            _ => unreachable!(),
+
+            _ => value = self.last_opcode,
         }
 
         (value, wait)
@@ -336,7 +337,7 @@ impl Memory for GbaMemory {
                 de_assign!(value, wait, self.load16_gamepak(address, 2, access))
             }
             REGION_SRAM => de_assign!(value, wait, self.load16_sram(address, access)),
-            _ => unreachable!(),
+            _ => value = self.last_opcode as u16,
         }
 
         // Addresses in load16 can be unaligned. In this case the GBA just rotates the value at the aligned
@@ -373,7 +374,7 @@ impl Memory for GbaMemory {
                 de_assign!(value, wait, self.load8_gamepak(address, 2, access))
             }
             REGION_SRAM => de_assign!(value, wait, self.load8_sram(address, access)),
-            _ => unreachable!(),
+            _ => value = self.last_opcode as u8,
         }
 
         (value, wait)
@@ -410,7 +411,7 @@ impl Memory for GbaMemory {
             }
             REGION_SRAM => wait = self.store32_sram(address, value, access),
 
-            _ => unreachable!(),
+            _ => debug!("write to invalid address 0x{:08X}=0x{:08X}", address, value),
         }
 
         wait
@@ -447,7 +448,7 @@ impl Memory for GbaMemory {
             }
             REGION_SRAM => wait = self.store16_sram(address, value, access),
 
-            _ => unreachable!(),
+            _ => debug!("write to invalid address 0x{:08X}=0x{:04X}", address, value),
         }
 
         wait
@@ -503,7 +504,7 @@ impl Memory for GbaMemory {
             }
             REGION_SRAM => wait = self.store8_sram(address, value, access),
 
-            _ => unreachable!(),
+            _ => debug!("write to invalid address 0x{:08X}=0x{:02X}", address, value),
         }
 
         wait

@@ -21,7 +21,7 @@ bitfields! {
         [0,2]   bg_mode, set_bg_mode: u16,
         [3]     cgb_mode, set_cgb_mode: bool,
         [4]     frame, set_framae: u16,
-        [5]     hblank_interval_free, set_hblank_interval_free: u16,
+        [5]     hblank_interval_free, set_hblank_interval_free: bool,
         [6]     obj_char_vram_mapping, set_obj_char_vram_mapping: ObjCharVramMapping,
         [7]     forced_blank, set_forced_blank: bool,
         [15]    obj_window_display, set_obj_window_display: bool,

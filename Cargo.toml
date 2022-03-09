@@ -6,6 +6,12 @@ resolver = "2"
 opt-level = 2
 debug-assertions = true
 
+[profile.profiling]
+inherits = 'release'
+opt-level = 3
+debug = 2
+debug-assertions = false
+
 # This will optimize all dependencies but should leave workspace members alone.
 [profile.dev.package."*"]
 opt-level = 3

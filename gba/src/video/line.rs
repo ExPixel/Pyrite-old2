@@ -37,11 +37,6 @@ impl LineBuffer {
         self.pixels[OBJ][x] = attrs.value as u16 | ((entry as u16) << 8);
     }
 
-    pub(crate) fn obj_pixel_attrs(&self, x: usize) -> PixelAttrs {
-        let value = self.pixels[OBJ][x] as u8;
-        PixelAttrs { value }
-    }
-
     pub(crate) fn put_4bpp(&mut self, layer: usize, x: usize, palette: u8, entry: u8) {
         self.pixels[layer][x] = ((palette as u16) << 4) | (entry as u16);
     }
@@ -278,11 +273,6 @@ impl PixelAttrs {
     }
 
     /// Only used by OBJ layer pixels
-    pub fn is_8bpp(&self) -> bool {
-        !self.is_4bpp()
-    }
-
-    /// Only used by OBJ layer pixels
     pub fn set_4bpp(&mut self) {
         self.value |= Self::PALETTE_4BPP;
     }
@@ -293,7 +283,7 @@ impl PixelAttrs {
     }
 
     pub fn set_priority(&mut self, priority: u16) {
-        self.value |= ((priority as u8) << 6);
+        self.value |= (priority as u8) << 6;
     }
 
     pub fn priority(&self) -> u16 {

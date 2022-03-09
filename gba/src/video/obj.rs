@@ -327,14 +327,6 @@ impl ObjAttr1 {
             _ => (8, 8),
         }
     }
-
-    pub fn width(&self, shape: ObjShape) -> u16 {
-        self.size(shape).0
-    }
-
-    pub fn height(&self, shape: ObjShape) -> u16 {
-        self.size(shape).1
-    }
 }
 
 bitfields! {

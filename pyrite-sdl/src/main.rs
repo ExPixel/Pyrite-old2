@@ -10,6 +10,7 @@ use anyhow::{Context as _, Error};
 use gba::{Button, ButtonSet};
 use sdl2::{
     event::Event,
+    keyboard::Keycode,
     pixels::{Color, PixelFormatEnum},
 };
 
@@ -115,7 +116,11 @@ fn run() -> anyhow::Result<()> {
 
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. } => {
+                Event::Quit { .. }
+                | Event::KeyUp {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => {
                     log::trace!("exiting SDL loop...");
                     break 'main_loop;
                 }

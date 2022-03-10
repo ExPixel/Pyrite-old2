@@ -7,14 +7,14 @@ pub use types::*;
 use util::bits::Bits as _;
 
 impl GbaMemory {
-    pub(super) fn load32_io(&mut self, address: u32) -> u32 {
-        let lo = self.load16_io(address) as u32;
-        let hi = self.load16_io(address + 2) as u32;
+    pub(super) fn load32_io<const SIDE_EFFECTS: bool>(&self, address: u32) -> u32 {
+        let lo = self.load16_io::<SIDE_EFFECTS>(address) as u32;
+        let hi = self.load16_io::<SIDE_EFFECTS>(address + 2) as u32;
 
         lo | (hi << 16)
     }
 
-    pub(super) fn load16_io(&mut self, address: u32) -> u16 {
+    pub(super) fn load16_io<const SIDE_EFFECTS: bool>(&self, address: u32) -> u16 {
         match address {
             // LCD
             DISPCNT => self.ioregs.dispcnt.into(),
@@ -43,9 +43,9 @@ impl GbaMemory {
         }
     }
 
-    pub(super) fn load8_io(&mut self, address: u32) -> u8 {
+    pub(super) fn load8_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u8 {
         let shift = (address & 1) * 8;
-        (self.load16_io(address & !0x1) >> shift) as u8
+        (self.load16_io::<SIDE_EFFECTS>(address & !0x1) >> shift) as u8
     }
 
     pub(super) fn store32_io(&mut self, address: u32, value: u32) {
@@ -94,54 +94,12 @@ impl GbaMemory {
         }
     }
 
-    pub(super) fn store8_io(&mut self, address: u32, value: u8) {
-        let mut value16 = self.view16_io(address);
+    pub(super) fn store8_io(&self, address: u32, value: u8) {
+        let mut value16 = self.load16_io::<false>(address);
         let shift = (address & 1) * 8;
         value16 &= !0xFF << shift;
         value16 |= (value as u16) << shift;
         self.store16_io(address, value16)
-    }
-
-    pub(super) fn view32_io(&self, address: u32) -> u32 {
-        let lo = self.view16_io(address) as u32;
-        let hi = self.view16_io(address + 2) as u32;
-
-        lo | (hi << 16)
-    }
-
-    pub(super) fn view16_io(&self, address: u32) -> u16 {
-        match address {
-            // LCD
-            DISPCNT => self.ioregs.dispcnt.into(),
-            GREENSWAP => self.ioregs.greenswap,
-            DISPSTAT => self.ioregs.dispstat.into(),
-            VCOUNT => self.ioregs.vcount,
-            BG0CNT => self.ioregs.bgcnt[0].into(),
-            BG1CNT => self.ioregs.bgcnt[1].into(),
-            BG2CNT => self.ioregs.bgcnt[2].into(),
-            BG3CNT => self.ioregs.bgcnt[3].into(),
-            BG0HOFS => self.ioregs.bgofs[0].x(),
-            BG0VOFS => self.ioregs.bgofs[0].y(),
-            BG1HOFS => self.ioregs.bgofs[1].x(),
-            BG1VOFS => self.ioregs.bgofs[1].y(),
-            BG2HOFS => self.ioregs.bgofs[2].x(),
-            BG2VOFS => self.ioregs.bgofs[2].y(),
-            BG3HOFS => self.ioregs.bgofs[3].x(),
-            BG3VOFS => self.ioregs.bgofs[3].y(),
-            BLDCNT => self.ioregs.bldcnt.into(),
-            BLDALPHA => self.ioregs.bldalpha.into(),
-            BLDY => self.ioregs.bldy.into(),
-
-            // Keypad Input
-            KEYINPUT => self.ioregs.keyinput,
-
-            WAITCNT => self.ioregs.waitcnt.into(),
-            _ => 0,
-        }
-    }
-
-    pub(super) fn view8_io(&self, address: u32) -> u8 {
-        (self.view16_io(address) >> ((address & 1) * 8)) as u8
     }
 
     pub(super) fn update_waitcnt(&mut self) {

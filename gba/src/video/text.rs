@@ -36,7 +36,7 @@ pub fn render_4bpp(
     let ty = scy as usize % 8;
 
     let mut dx = 0;
-    let mut tile_loader = TileLoader::new(vram, bgcnt.screen_base(), start_scx, scy, screen_h);
+    let mut tile_loader = TileLoader::new(vram, bgcnt.screen_base(), start_scx, scy, screen_w);
 
     while dx < 240 {
         let scx = start_scx + dx;
@@ -123,7 +123,7 @@ pub fn render_8bpp(
     let ty = scy as usize % 8;
 
     let mut dx = 0;
-    let mut tile_loader = TileLoader::new(vram, bgcnt.screen_base(), start_scx, scy, screen_h);
+    let mut tile_loader = TileLoader::new(vram, bgcnt.screen_base(), start_scx, scy, screen_w);
 
     while dx < 240 {
         let scx = start_scx + dx;

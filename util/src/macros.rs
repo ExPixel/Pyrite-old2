@@ -123,6 +123,10 @@ macro_rules! from_bits {
         $bits as u16
     };
 
+    ($bits:expr, u64, u16) => {
+        $bits as u16
+    };
+
     ($bits:expr, $SrcType:ty, bool) => {
         $bits != 0
     };

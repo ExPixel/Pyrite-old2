@@ -25,14 +25,6 @@ impl GbaMemory {
             BG1CNT => self.ioregs.bgcnt[1].into(),
             BG2CNT => self.ioregs.bgcnt[2].into(),
             BG3CNT => self.ioregs.bgcnt[3].into(),
-            BG0HOFS => self.ioregs.bgofs[0].x(),
-            BG0VOFS => self.ioregs.bgofs[0].y(),
-            BG1HOFS => self.ioregs.bgofs[1].x(),
-            BG1VOFS => self.ioregs.bgofs[1].y(),
-            BG2HOFS => self.ioregs.bgofs[2].x(),
-            BG2VOFS => self.ioregs.bgofs[2].y(),
-            BG3HOFS => self.ioregs.bgofs[3].x(),
-            BG3VOFS => self.ioregs.bgofs[3].y(),
             BLDCNT => self.ioregs.bldcnt.into(),
             BLDALPHA => self.ioregs.bldalpha.into(),
             BLDY => self.ioregs.bldy.into(),
@@ -42,7 +34,10 @@ impl GbaMemory {
 
             WAITCNT => self.ioregs.waitcnt.into(),
             _ => {
-                log::warn!("attempted to read from unused IO address 0x{:08X}", address);
+                log::warn!(
+                    "attempted to read from unused/readonly IO address 0x{:08X}",
+                    address
+                );
                 0
             }
         }

@@ -45,6 +45,18 @@ impl LineBuffer {
         self.pixels[layer][x] = entry as u16;
     }
 
+    /// Same as put_8bpp but places 8 pixels at a time stored in a [`u64`].
+    pub(crate) fn put_8bpp_8(&mut self, layer: usize, x: usize, entries: u64) {
+        self.pixels[layer][x] = entries as u8 as u16;
+        self.pixels[layer][x + 1] = (entries >> 8) as u8 as u16;
+        self.pixels[layer][x + 2] = (entries >> 16) as u8 as u16;
+        self.pixels[layer][x + 3] = (entries >> 24) as u8 as u16;
+        self.pixels[layer][x + 4] = (entries >> 32) as u8 as u16;
+        self.pixels[layer][x + 5] = (entries >> 40) as u8 as u16;
+        self.pixels[layer][x + 6] = (entries >> 48) as u8 as u16;
+        self.pixels[layer][x + 7] = (entries >> 56) as u8 as u16;
+    }
+
     pub(crate) fn layer_attrs_mut(&mut self, layer: usize) -> &mut LayerAttrs {
         &mut self.layer_attrs[layer]
     }

@@ -18,7 +18,7 @@ pub fn render(
         let bgofs = ioregs.bgofs[bg as usize];
 
         if bgcnt.palette_256() {
-            log::debug!("render 8bpp")
+            text::render_8bpp(buf, line, bg as usize, bgcnt, bgofs, vram);
         } else {
             text::render_4bpp(buf, line, bg as usize, bgcnt, bgofs, vram);
         }

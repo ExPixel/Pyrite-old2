@@ -12,14 +12,14 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn schedule(&mut self, callback: EventFn, cycles: impl Into<Cycles>) {
+    pub fn schedule(&self, callback: EventFn, cycles: impl Into<Cycles>) {
         self.inner.borrow_mut().schedule(Event {
             callback,
             cycles_remaining: cycles.into(),
         });
     }
 
-    pub fn advance(&mut self, cycles: impl Into<Cycles>) -> Option<(EventFn, Cycles)> {
+    pub fn advance(&self, cycles: impl Into<Cycles>) -> Option<(EventFn, Cycles)> {
         self.inner.borrow_mut().advance(cycles.into())
     }
 

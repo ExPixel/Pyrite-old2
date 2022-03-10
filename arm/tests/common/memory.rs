@@ -1,5 +1,5 @@
 use arm::Memory;
-use byteorder::{ByteOrder, LittleEndian};
+use util::mem::{read_u16, read_u32, write_u16, write_u32};
 
 pub struct TestMemory {
     data: Vec<u8>,
@@ -31,22 +31,22 @@ impl TestMemory {
     }
 
     pub fn view32(&mut self, address: u32) -> u32 {
-        LittleEndian::read_u32(&self.data[address as usize..])
+        read_u32(&self.data, address as usize)
     }
 
     pub fn view16(&mut self, address: u32) -> u16 {
-        LittleEndian::read_u16(&self.data[address as usize..])
+        read_u16(&self.data, address as usize)
     }
 }
 
 impl Memory for TestMemory {
     fn load32(&mut self, address: u32, _access: arm::AccessType) -> (u32, arm::Waitstates) {
-        let data = LittleEndian::read_u32(&self.data[address as usize..]);
+        let data = read_u32(&self.data, address as usize);
         (data, 0u8.into())
     }
 
     fn load16(&mut self, address: u32, _access: arm::AccessType) -> (u16, arm::Waitstates) {
-        let data = LittleEndian::read_u16(&self.data[address as usize..]);
+        let data = read_u16(&self.data, address as usize);
         (data, 0u8.into())
     }
 
@@ -55,12 +55,12 @@ impl Memory for TestMemory {
     }
 
     fn store32(&mut self, address: u32, value: u32, _access: arm::AccessType) -> arm::Waitstates {
-        LittleEndian::write_u32(&mut self.data[address as usize..], value);
+        write_u32(&mut self.data, address as usize, value);
         0u8.into()
     }
 
     fn store16(&mut self, address: u32, value: u16, _access: arm::AccessType) -> arm::Waitstates {
-        LittleEndian::write_u16(&mut self.data[address as usize..], value);
+        write_u16(&mut self.data, address as usize, value);
         0u8.into()
     }
 

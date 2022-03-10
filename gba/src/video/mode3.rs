@@ -1,5 +1,6 @@
+use util::mem::read_u16;
+
 use crate::memory::VRAM_SIZE;
-use byteorder::{ByteOrder as _, LittleEndian as LE};
 
 use super::line::LineBuffer;
 
@@ -21,6 +22,6 @@ pub fn render(line: u16, buf: &mut LineBuffer, vram: &[u8; VRAM_SIZE as usize]) 
 
     let vstart = 480 * line as usize;
     for x in 0..240 {
-        buf.put(2, x, LE::read_u16(&vram[(vstart + x * 2)..]));
+        buf.put(2, x, read_u16(&*vram, vstart + x * 2));
     }
 }

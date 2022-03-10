@@ -1,6 +1,6 @@
 use super::{GbaMemory, ROM_MAX_MASK};
 use arm::{AccessType, Waitstates};
-use byteorder::{ByteOrder, LittleEndian as LE};
+use util::mem::{read_u16, read_u32};
 
 impl GbaMemory {
     pub(super) fn load32_gamepak(
@@ -11,7 +11,7 @@ impl GbaMemory {
     ) -> (u32, Waitstates) {
         let masked = (address & ROM_MAX_MASK) as usize;
         let value = if masked < self.rom.len() {
-            LE::read_u32(&self.rom[masked..])
+            read_u32(&self.rom, masked)
         } else {
             0
         };
@@ -31,7 +31,7 @@ impl GbaMemory {
     ) -> (u16, Waitstates) {
         let masked = (address & ROM_MAX_MASK) as usize;
         let value = if masked < self.rom.len() {
-            LE::read_u16(&self.rom[masked..])
+            read_u16(&self.rom, masked)
         } else {
             0
         };

@@ -8,5 +8,4 @@ edition = "2021"
 [dependencies]
 arm = { path = "../arm" }
 util = { path = "../util" }
-byteorder="1"
 log = "0.4"

@@ -2,8 +2,7 @@ use crate::memory::{
     io::{BgControl, BgOffset},
     VRAM_SIZE,
 };
-use byteorder::{ByteOrder as _, LittleEndian as LE};
-use util::mem::{read_u32_unchecked, read_u64_unchecked};
+use util::mem::{read_u32_unchecked, read_u64, read_u64_unchecked};
 
 use super::line::LineBuffer;
 
@@ -210,7 +209,7 @@ impl<'v> TileLoader<'v> {
 
         let misalignment = offset % 8;
         let block = if misalignment != 0 {
-            let v = LE::read_u64(&vram[offset & !0x7..]); // aligned load
+            let v = read_u64(vram, offset & !0x7); // aligned load
             if x % 8 != 0 {
                 offset += 2;
                 v >> (misalignment * 8)
@@ -222,7 +221,7 @@ impl<'v> TileLoader<'v> {
         } else if x % 8 != 0 {
             // We're block aligned, but since we're not tile aligned, we have to preload the block
             // because a call to advance won't be done before the next pixel offset is read.
-            let v = LE::read_u64(&vram[offset..]);
+            let v = read_u64(vram, offset);
             offset += 2;
             v
         } else {
@@ -243,6 +242,7 @@ impl<'v> TileLoader<'v> {
                     (-0x800isize) as usize
                 }
             } else {
+                log::debug!("here");
                 0
             },
         }
@@ -260,9 +260,9 @@ impl<'v> TileLoader<'v> {
             if self.offset == self.line_end {
                 self.offset = (self.offset.wrapping_sub(2) & !0x3F).wrapping_add(self.next_area);
                 self.line_end = self.offset + 64;
-                self.block = LE::read_u64(&self.vram[self.offset..]);
+                self.block = read_u64(self.vram, self.offset);
             } else {
-                self.block = LE::read_u64(&self.vram[self.offset..]);
+                self.block = read_u64(self.vram, self.offset);
             }
         } else {
             self.block >>= 16;

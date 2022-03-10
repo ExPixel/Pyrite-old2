@@ -1,5 +1,7 @@
-use byteorder::{ByteOrder as _, LittleEndian as LE};
-use util::array;
+use util::{
+    array,
+    mem::{read_u16, read_u32, write_u16, write_u32},
+};
 
 use super::{PAL_MASK, PAL_SIZE};
 
@@ -34,11 +36,11 @@ impl Palette {
     }
 
     pub fn load32(&self, address: u32) -> u32 {
-        LE::read_u32(&self.data[(address & PAL_MASK) as usize..])
+        read_u32(&*self.data, (address & PAL_MASK) as usize)
     }
 
     pub fn load16(&self, address: u32) -> u16 {
-        LE::read_u16(&self.data[(address & PAL_MASK) as usize..])
+        read_u16(&*self.data, (address & PAL_MASK) as usize)
     }
 
     pub fn load8(&self, address: u32) -> u8 {
@@ -46,11 +48,11 @@ impl Palette {
     }
 
     pub fn store32(&mut self, address: u32, value: u32) {
-        LE::write_u32(&mut self.data[(address & PAL_MASK) as usize..], value);
+        write_u32(&mut *self.data, (address & PAL_MASK) as usize, value);
     }
 
     pub fn store16(&mut self, address: u32, value: u16) {
-        LE::write_u16(&mut self.data[(address & PAL_MASK) as usize..], value);
+        write_u16(&mut *self.data, (address & PAL_MASK) as usize, value);
     }
 
     pub fn store8(&mut self, address: u32, value: u8) {
@@ -62,11 +64,11 @@ impl Palette {
     }
 
     pub fn view32(&self, address: u32) -> u32 {
-        LE::read_u32(&self.data[(address & PAL_MASK) as usize..])
+        read_u32(&*self.data, (address & PAL_MASK) as usize)
     }
 
     pub fn view16(&self, address: u32) -> u16 {
-        LE::read_u16(&self.data[(address & PAL_MASK) as usize..])
+        read_u16(&*self.data, (address & PAL_MASK) as usize)
     }
 
     pub fn view8(&self, address: u32) -> u8 {

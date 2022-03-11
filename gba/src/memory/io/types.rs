@@ -227,6 +227,91 @@ impl BrightnessCoeff {
 }
 
 bitfields! {
+    /// 4000040h - WIN0H - Window 0 Horizontal Dimensions (W)
+    /// 4000042h - WIN1H - Window 1 Horizontal Dimensions (W)
+    ///   Bit   Expl.
+    ///   0-7   X2, Rightmost coordinate of window, plus 1
+    ///   8-15  X1, Leftmost coordinate of window
+    ///
+    /// 4000044h - WIN0V - Window 0 Vertical Dimensions (W)
+    /// 4000046h - WIN1V - Window 1 Vertical Dimensions (W)
+    ///   Bit   Expl.
+    ///   0-7   Y2, Bottom-most coordinate of window, plus 1
+    ///   8-15  Y1, Top-most coordinate of window
+    pub struct WindowDimensions: u64 {
+        [0,7]   win0_x2, set_win0_x2: u16,
+        [8,15]  win0_x1, set_win0_x1: u16,
+
+        [16,23] win1_x2, set_win1_x2: u16,
+        [24,31] win1_x1, set_win1_x1: u16,
+
+        [32,39] win0_y2, set_win0_y2: u16,
+        [40,47] win0_y1, set_win0_y1: u16,
+
+        [48,55] win1_y2, set_win1_y2: u16,
+        [56,63] win1_y1, set_win1_y1: u16,
+
+        [0,15]  win0_h, set_win0_h: u16,
+        [16,31] win1_h, set_win1_h: u16,
+        [32,47] win0_v, set_win0_v: u16,
+        [48,63] win1_v, set_win1_v: u16,
+    }
+}
+
+bitfields! {
+    pub struct WindowInOut: u32 {
+        [0,15]  winin, set_winin: u16,
+        [16,31] winout, set_winout: u16,
+    }
+}
+
+impl WindowInOut {
+    pub fn win0_layer_enabled(&self, layer: usize) -> bool {
+        if layer > 4 {
+            return false;
+        }
+        self.value.is_bit_set(layer as u32)
+    }
+
+    pub fn win0_effects_enabled(&self) -> bool {
+        self.value.is_bit_set(5)
+    }
+
+    pub fn win1_layer_enabled(&self, layer: usize) -> bool {
+        if layer > 4 {
+            return false;
+        }
+        self.value.is_bit_set(layer as u32 + 8)
+    }
+
+    pub fn win1_effects_enabled(&self) -> bool {
+        self.value.is_bit_set(13)
+    }
+
+    pub fn winout_layer_enabled(&self, layer: usize) -> bool {
+        if layer > 4 {
+            return false;
+        }
+        self.value.is_bit_set(layer as u32 + 16)
+    }
+
+    pub fn winout_effects_enabled(&self) -> bool {
+        self.value.is_bit_set(21)
+    }
+
+    pub fn winobj_layer_enabled(&self, layer: usize) -> bool {
+        if layer > 4 {
+            return false;
+        }
+        self.value.is_bit_set(layer as u32 + 24)
+    }
+
+    pub fn winobj_effects_enabled(&self) -> bool {
+        self.value.is_bit_set(29)
+    }
+}
+
+bitfields! {
     pub struct WaitstateControl: u16 {
         readonly = 0x8000
     }

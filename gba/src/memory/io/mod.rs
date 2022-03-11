@@ -28,6 +28,12 @@ impl GbaMemory {
             BLDCNT => self.ioregs.bldcnt.into(),
             BLDALPHA => self.ioregs.bldalpha.into(),
             BLDY => self.ioregs.bldy.into(),
+            WIN0H => self.ioregs.winhv.win0_h(),
+            WIN1H => self.ioregs.winhv.win1_h(),
+            WIN0V => self.ioregs.winhv.win0_v(),
+            WIN1V => self.ioregs.winhv.win1_v(),
+            WININ => self.ioregs.wininout.winin(),
+            WINOUT => self.ioregs.wininout.winout(),
 
             // Keypad Input
             KEYINPUT => self.ioregs.keyinput,
@@ -75,6 +81,12 @@ impl GbaMemory {
             BLDCNT => self.ioregs.bldcnt.set_preserve_bits(value),
             BLDALPHA => self.ioregs.bldalpha.set_preserve_bits(value),
             BLDY => self.ioregs.bldy.set_preserve_bits(value),
+            WIN0H => self.ioregs.winhv.set_win0_h(value),
+            WIN1H => self.ioregs.winhv.set_win1_h(value),
+            WIN0V => self.ioregs.winhv.set_win0_v(value),
+            WIN1V => self.ioregs.winhv.set_win1_v(value),
+            WININ => self.ioregs.wininout.set_winin(value),
+            WINOUT => self.ioregs.wininout.set_winout(value),
 
             // Keypad Input
             KEYINPUT => { /*NOP */ }
@@ -94,7 +106,7 @@ impl GbaMemory {
         }
     }
 
-    pub(super) fn store8_io(&self, address: u32, value: u8) {
+    pub(super) fn store8_io(&mut self, address: u32, value: u8) {
         let mut value16 = self.load16_io::<false>(address);
         let shift = (address & 1) * 8;
         value16 &= !0xFF << shift;
@@ -153,16 +165,19 @@ pub struct IoRegisters {
     pub(crate) dispcnt: LCDControl,
     pub(crate) greenswap: u16,
     pub(crate) dispstat: LCDStatus,
-    pub(crate) waitcnt: WaitstateControl,
     pub(crate) vcount: u16,
+    pub(crate) bgcnt: [BgControl; 4],
+    pub(crate) bgofs: [BgOffset; 4],
+    pub(crate) winhv: WindowDimensions,
+    pub(crate) wininout: WindowInOut,
     pub(crate) bldcnt: ColorSpecialEffects,
     pub(crate) bldalpha: AlphaBlendingCoeff,
     pub(crate) bldy: BrightnessCoeff,
-    pub(crate) bgcnt: [BgControl; 4],
-    pub(crate) bgofs: [BgOffset; 4],
 
     // Keypad Input
     pub(crate) keyinput: u16,
+
+    pub(crate) waitcnt: WaitstateControl,
 }
 
 impl IoRegisters {

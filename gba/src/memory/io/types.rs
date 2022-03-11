@@ -24,6 +24,8 @@ bitfields! {
         [5]     hblank_interval_free, set_hblank_interval_free: bool,
         [6]     obj_char_vram_mapping, set_obj_char_vram_mapping: ObjCharVramMapping,
         [7]     forced_blank, set_forced_blank: bool,
+        [13]    win0_display, set_win0_dispay: bool,
+        [14]    win1_display, set_win1_display: bool,
         [15]    obj_window_display, set_obj_window_display: bool,
     }
 }
@@ -42,6 +44,11 @@ impl LCDControl {
 
     pub fn is_bitmap_mode(&self) -> bool {
         (3..6).contains(&self.bg_mode())
+    }
+
+    /// Returns true if any windows are enabled.
+    pub fn windows_enabled(&self) -> bool {
+        self.value.bits(13, 15) != 0
     }
 }
 

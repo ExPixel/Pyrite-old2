@@ -1,7 +1,10 @@
 use util::bits::Bits as _;
 
 use crate::memory::{
-    io::{AlphaBlendingCoeff, BrightnessCoeff, Effect, IoRegisters},
+    io::{
+        AlphaBlendingCoeff, BrightnessCoeff, Effect, IoRegisters, LCDControl, WindowDimensions,
+        WindowInOut,
+    },
     palette::Palette,
 };
 
@@ -29,11 +32,17 @@ impl LineBuffer {
     }
 
     pub(crate) fn put_obj_4bpp(&mut self, attrs: PixelAttrs, x: usize, palette: u8, entry: u8) {
+        if entry == 0 {
+            return;
+        }
         self.pixels[OBJ][x] =
             (attrs.value as u16) | ((palette as u16) << 12) | ((entry as u16) << 8);
     }
 
     pub(crate) fn put_obj_8bpp(&mut self, attrs: PixelAttrs, x: usize, entry: u8) {
+        if entry == 0 {
+            return;
+        }
         self.pixels[OBJ][x] = attrs.value as u16 | ((entry as u16) << 8);
     }
 
@@ -111,6 +120,77 @@ impl LineBuffer {
         }
     }
 
+    fn generate_window_mask(&self, layer: usize, ioregs: &IoRegisters) -> WindowMask {
+        let windows_enabled = ioregs.dispcnt.windows_enabled();
+        if !ioregs.dispcnt.windows_enabled() {
+            return WindowMask::new_all_enabled();
+        }
+
+        let win0_enabled = ioregs.dispcnt.win0_display();
+        let win1_enabled = ioregs.dispcnt.win1_display();
+
+        let in_win0 = ioregs.wininout.win0_layer_enabled(layer);
+        let in_win1 = ioregs.wininout.win1_layer_enabled(layer);
+        let in_winout = ioregs.wininout.winout_layer_enabled(layer);
+        let in_winobj = ioregs.wininout.winobj_layer_enabled(layer);
+        if !(in_win0 | in_win1 | in_winout | in_winobj) {
+            return WindowMask::new_all_disabled();
+        }
+
+        let win0_t = ioregs.winhv.win0_y1();
+        let mut win0_b = ioregs.winhv.win0_y2();
+        let win1_t = ioregs.winhv.win1_y1();
+        let mut win1_b = ioregs.winhv.win1_y2();
+        if win0_b > 160 || win0_t > win0_b {
+            win0_b = 160;
+        }
+        if win1_b > 160 || win1_t > win1_b {
+            win1_b = 160;
+        }
+
+        let line = ioregs.vcount;
+        let in_win0_bounds_v = line >= win0_t && line < win0_b;
+        let in_win1_bounds_v = line >= win1_t && line < win1_b;
+
+        let win0_l = ioregs.winhv.win0_x1();
+        let mut win0_r = ioregs.winhv.win0_x2();
+        let win1_l = ioregs.winhv.win1_x1();
+        let mut win1_r = ioregs.winhv.win1_x2();
+        if win0_r > 240 || win0_l > win0_r {
+            win0_r = 240;
+        }
+        if win1_r > 240 || win1_l > win1_r {
+            win1_r = 240;
+        }
+
+        let win0_effects = ioregs.wininout.win0_effects_enabled();
+        let win1_effects = ioregs.wininout.win1_effects_enabled();
+        let winout_effects = ioregs.wininout.winout_effects_enabled();
+        let winobj_effects = ioregs.wininout.winobj_effects_enabled();
+
+        let mut mask = WindowMask::new_all_disabled();
+
+        for x in 0..240 {
+            let in_win0_bounds = in_win0_bounds_v && x >= win0_l && x < win0_r;
+            if win0_enabled && in_win0_bounds {
+                mask.set_visible(x as _, in_win0, win0_effects);
+                continue;
+            }
+
+            let in_win1_bounds = in_win1_bounds_v && x >= win1_l && x < win1_r;
+            if win1_enabled && in_win1_bounds {
+                mask.set_visible(x as _, in_win1, win1_effects);
+                continue;
+            }
+
+            if in_winout {
+                mask.set_visible(x as _, true, winout_effects);
+            }
+        }
+
+        mask
+    }
+
     pub fn render(&self, output: &mut [u16], ioregs: &IoRegisters, palette: &Palette) {
         let backdrop_color = palette.get_bg256(0) | 0x8000;
         let mut backdrop_attrs = PixelAttrs::default();
@@ -123,10 +203,10 @@ impl LineBuffer {
         let mut backdrop = Pixel::default();
         backdrop.push(backdrop_color, backdrop_attrs);
         let mut pixels = [backdrop; 240];
+        let obj_mask = self.generate_window_mask(OBJ, ioregs);
 
         for priority in (0..4).rev() {
             for bg in (0usize..4).rev() {
-                // FIXME do window checks here.
                 if !ioregs.dispcnt.display_bg(bg as _) || ioregs.bgcnt[bg].priority() != priority {
                     continue;
                 }
@@ -139,17 +219,25 @@ impl LineBuffer {
                     attrs.set_second_target();
                 }
 
+                let mask = self.generate_window_mask(bg, ioregs);
+
                 (0..240).for_each(|x| {
+                    if !mask.visible(x) {
+                        return;
+                    }
+
                     if let Some(color) = self.color_bg(bg, x, palette) {
-                        pixels[x].push(color, attrs);
+                        pixels[x].push(color, attrs.effects_mask(mask.effects(x)));
                     }
                 });
             }
 
+            // FIXME encode priority in pixels (or use a separate array) then use that to calcualte
+            //       this once instead of for each priority.
             if ioregs.dispcnt.display_obj() {
                 (0..240).for_each(|x| {
                     if let Some((color, attrs)) = self.color_obj(x, priority, palette) {
-                        pixels[x].push(color, attrs);
+                        pixels[x].push(color, attrs.effects_mask(obj_mask.effects(x)));
                     }
                 });
             }
@@ -327,6 +415,13 @@ impl PixelAttrs {
     const PALETTE_4BPP: u8 = 0x4; // bit 2
     const SEMI_TRANSPARENT: u8 = 0x8; // bit 3
 
+    fn effects_mask(mut self, has_effects: bool) -> Self {
+        if !has_effects {
+            self.value &= !0xB; // mask out bits 0,1,3
+        }
+        self
+    }
+
     pub fn is_first_target(&self) -> bool {
         (self.value & Self::FIRST_TARGET) != 0
     }
@@ -343,7 +438,7 @@ impl PixelAttrs {
         self.value |= Self::SECOND_TARGET;
     }
 
-    /// Only used by OBJ layer pixels
+    /// Only used by OBJ layer pixels while calculating color.
     pub fn is_4bpp(&self) -> bool {
         (self.value & Self::PALETTE_4BPP) != 0
     }
@@ -372,5 +467,50 @@ impl PixelAttrs {
 
     pub fn priority(&self) -> u16 {
         (self.value >> 6) as u16
+    }
+}
+
+#[derive(Copy, Clone)]
+struct WindowMask {
+    visible: [u8; 30],
+    effects: [u8; 30],
+}
+
+impl WindowMask {
+    fn new_all_enabled() -> Self {
+        WindowMask {
+            visible: [0xFF; 30],
+            effects: [0xFF; 30],
+        }
+    }
+
+    fn new_all_disabled() -> Self {
+        WindowMask {
+            visible: [0x00; 30],
+            effects: [0x00; 30],
+        }
+    }
+
+    fn set_visible(&mut self, x: usize, visible: bool, effects: bool) {
+        if x < 240 {
+            self.visible[x / 8] |= (visible as u8) << (x % 8);
+            self.effects[x / 8] |= (effects as u8) << (x % 8);
+        }
+    }
+
+    fn visible(&self, x: usize) -> bool {
+        if x < 240 {
+            (self.visible[x / 8] & (1 << (x % 8))) != 0
+        } else {
+            false
+        }
+    }
+
+    fn effects(&self, x: usize) -> bool {
+        if x < 240 {
+            (self.effects[x / 8] & (1 << (x % 8))) != 0
+        } else {
+            false
+        }
     }
 }

@@ -233,6 +233,10 @@ impl LineBuffer {
             //       this once instead of for each priority.
             if ioregs.dispcnt.display_obj() {
                 (0..240).for_each(|x| {
+                    if !obj_mask.visible(x) {
+                        return;
+                    }
+
                     if let Some((color, attrs)) = self.color_obj(x, priority, palette) {
                         pixels[x].push(color, attrs.effects_mask(obj_mask.effects(x)));
                     }

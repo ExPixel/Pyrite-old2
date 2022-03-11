@@ -120,6 +120,14 @@ impl LineBuffer {
         }
     }
 
+    fn in_win_bounds(v: u16, lo: u16, hi: u16) -> bool {
+        if lo <= hi {
+            v >= lo && v < hi
+        } else {
+            v >= lo || v < hi
+        }
+    }
+
     fn generate_window_mask(&self, layer: usize, ioregs: &IoRegisters) -> WindowMask {
         let windows_enabled = ioregs.dispcnt.windows_enabled();
         if !ioregs.dispcnt.windows_enabled() {
@@ -128,6 +136,7 @@ impl LineBuffer {
 
         let win0_enabled = ioregs.dispcnt.win0_display();
         let win1_enabled = ioregs.dispcnt.win1_display();
+        let winobj_enabled = ioregs.dispcnt.obj_window_display();
 
         let in_win0 = ioregs.wininout.win0_layer_enabled(layer);
         let in_win1 = ioregs.wininout.win1_layer_enabled(layer);
@@ -138,30 +147,18 @@ impl LineBuffer {
         }
 
         let win0_t = ioregs.winhv.win0_y1();
-        let mut win0_b = ioregs.winhv.win0_y2();
+        let win0_b = ioregs.winhv.win0_y2();
         let win1_t = ioregs.winhv.win1_y1();
-        let mut win1_b = ioregs.winhv.win1_y2();
-        if win0_b > 160 || win0_t > win0_b {
-            win0_b = 160;
-        }
-        if win1_b > 160 || win1_t > win1_b {
-            win1_b = 160;
-        }
+        let win1_b = ioregs.winhv.win1_y2();
 
         let line = ioregs.vcount;
-        let in_win0_bounds_v = line >= win0_t && line < win0_b;
-        let in_win1_bounds_v = line >= win1_t && line < win1_b;
+        let in_win0_bounds_v = Self::in_win_bounds(line, win0_t, win0_b);
+        let in_win1_bounds_v = Self::in_win_bounds(line, win1_t, win1_b);
 
         let win0_l = ioregs.winhv.win0_x1();
-        let mut win0_r = ioregs.winhv.win0_x2();
+        let win0_r = ioregs.winhv.win0_x2();
         let win1_l = ioregs.winhv.win1_x1();
-        let mut win1_r = ioregs.winhv.win1_x2();
-        if win0_r > 240 || win0_l > win0_r {
-            win0_r = 240;
-        }
-        if win1_r > 240 || win1_l > win1_r {
-            win1_r = 240;
-        }
+        let win1_r = ioregs.winhv.win1_x2();
 
         let win0_effects = ioregs.wininout.win0_effects_enabled();
         let win1_effects = ioregs.wininout.win1_effects_enabled();
@@ -171,13 +168,13 @@ impl LineBuffer {
         let mut mask = WindowMask::new_all_disabled();
 
         for x in 0..240 {
-            let in_win0_bounds = in_win0_bounds_v && x >= win0_l && x < win0_r;
+            let in_win0_bounds = in_win0_bounds_v && Self::in_win_bounds(x, win0_l, win0_r);
             if win0_enabled && in_win0_bounds {
                 mask.set_visible(x as _, in_win0, win0_effects);
                 continue;
             }
 
-            let in_win1_bounds = in_win1_bounds_v && x >= win1_l && x < win1_r;
+            let in_win1_bounds = in_win1_bounds_v && Self::in_win_bounds(x, win1_l, win1_r);
             if win1_enabled && in_win1_bounds {
                 mask.set_visible(x as _, in_win1, win1_effects);
                 continue;

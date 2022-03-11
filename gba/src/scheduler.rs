@@ -81,7 +81,7 @@ mod test {
     #[test]
     fn basic_scheduling() {
         let mut gba = Gba::default();
-        let mut scheduler = Scheduler::default();
+        let scheduler = Scheduler::default();
 
         scheduler.schedule(|_, _| data()[0] = 1, 10u32);
         scheduler.schedule(|_, _| data()[3] = 1, 17u32);

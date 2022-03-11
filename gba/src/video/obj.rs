@@ -146,6 +146,7 @@ pub fn render(
                 32
             };
         let first_tile_index = attr2.character_name() as usize;
+        let mode = attr0.mode();
 
         let mut attrs = PixelAttrs::default();
         if ioregs.bldcnt.is_first_target(OBJ) {
@@ -154,7 +155,7 @@ pub fn render(
         if ioregs.bldcnt.is_second_target(OBJ) {
             attrs.set_second_target();
         }
-        if attr0.mode() == ObjMode::SemiTransparent {
+        if mode == ObjMode::SemiTransparent {
             attrs.set_semi_transparent();
         }
 
@@ -202,7 +203,12 @@ pub fn render(
                     let pixel_offset =
                         (tile * BYTES_PER_TILE) + ((yi % 8) * BYTES_PER_LINE) + (xi % 8);
                     let entry = tile_data[pixel_offset as usize];
-                    buf.put_obj_8bpp(attrs, screen_x, entry);
+
+                    if mode != ObjMode::ObjWindow {
+                        buf.put_obj_8bpp(attrs, screen_x, entry);
+                    } else if entry != 0 {
+                        buf.put_obj_window(screen_x);
+                    }
                 }
 
                 x += dx;
@@ -234,7 +240,12 @@ pub fn render(
                     let pixel_offset =
                         (tile * BYTES_PER_TILE) + ((yi % 8) * BYTES_PER_LINE) + (xi % 8) / 2;
                     let entry = (tile_data[pixel_offset] >> ((xi % 2) << 2)) & 0xF;
-                    buf.put_obj_4bpp(attrs, screen_x, attr2.palette() as _, entry);
+
+                    if mode != ObjMode::ObjWindow {
+                        buf.put_obj_4bpp(attrs, screen_x, attr2.palette() as _, entry);
+                    } else if entry != 0 {
+                        buf.put_obj_window(screen_x);
+                    }
                 }
 
                 x += dx;

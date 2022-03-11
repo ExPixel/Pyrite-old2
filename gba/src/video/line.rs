@@ -1,10 +1,7 @@
 use util::bits::Bits as _;
 
 use crate::memory::{
-    io::{
-        AlphaBlendingCoeff, BrightnessCoeff, Effect, IoRegisters, LCDControl, WindowDimensions,
-        WindowInOut,
-    },
+    io::{AlphaBlendingCoeff, BrightnessCoeff, Effect, IoRegisters},
     palette::Palette,
 };
 
@@ -44,6 +41,11 @@ impl LineBuffer {
             return;
         }
         self.pixels[OBJ][x] = attrs.value as u16 | ((entry as u16) << 8);
+    }
+
+    pub(crate) fn put_obj_window(&mut self, x: usize) {
+        // NOTE: This relies on attrs being in the bottom 8 bits of the pixels for OBJs.
+        self.pixels[OBJ][x] |= PixelAttrs::OBJ_WINDOW as u16;
     }
 
     pub(crate) fn put_4bpp(&mut self, layer: usize, x: usize, palette: u8, entry: u8) {
@@ -128,8 +130,12 @@ impl LineBuffer {
         }
     }
 
+    fn has_obj_window_pixel(&self, x: usize) -> bool {
+        // NOTE: This relies on attrs being in the bottom 8 bits of the pixels for OBJs.
+        (self.pixels[OBJ][x] & (PixelAttrs::OBJ_WINDOW as u16)) != 0
+    }
+
     fn generate_window_mask(&self, layer: usize, ioregs: &IoRegisters) -> WindowMask {
-        let windows_enabled = ioregs.dispcnt.windows_enabled();
         if !ioregs.dispcnt.windows_enabled() {
             return WindowMask::new_all_enabled();
         }
@@ -178,6 +184,10 @@ impl LineBuffer {
             if win1_enabled && in_win1_bounds {
                 mask.set_visible(x as _, in_win1, win1_effects);
                 continue;
+            }
+
+            if winobj_enabled && self.has_obj_window_pixel(x as usize) {
+                mask.set_visible(x as _, in_winobj, winobj_effects);
             }
 
             if in_winout {
@@ -415,6 +425,7 @@ impl PixelAttrs {
     const SECOND_TARGET: u8 = 0x2; // bit 1
     const PALETTE_4BPP: u8 = 0x4; // bit 2
     const SEMI_TRANSPARENT: u8 = 0x8; // bit 3
+    const OBJ_WINDOW: u8 = 0x10;
 
     fn effects_mask(mut self, has_effects: bool) -> Self {
         if !has_effects {

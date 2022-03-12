@@ -31,7 +31,8 @@ impl Gba {
     pub fn reset(&mut self) {
         self.mem.init();
         self.video.init(&mut self.mem);
-        self.cpu.branch(0x08000000, &mut self.mem);
+        self.mem.use_custom_bios();
+        self.cpu.branch(0x0, &mut self.mem);
     }
 
     pub fn set_gamepak(&mut self, cart: Vec<u8>) {

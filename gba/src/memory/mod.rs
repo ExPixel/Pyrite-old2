@@ -42,6 +42,8 @@ pub const PAL_MASK: u32 = 0x3FF;
 pub const OAM_MASK: u32 = 0x3FF;
 pub const ROM_MAX_MASK: u32 = 0xFFFFFF;
 
+pub static CUSTOM_BIOS: &[u8] = include_bytes!("../../../bios/bios.bin");
+
 pub struct GbaMemory {
     pub(crate) bios: Box<[u8; BIOS_SIZE as usize]>,
     pub(crate) ewram: Box<[u8; EWRAM_SIZE as usize]>,
@@ -60,6 +62,8 @@ pub struct GbaMemory {
     gamepak_waitstates: [Waitstates; 6],
     ewram_waitstates: Waitstates,
     sram_waitstates: Waitstates,
+
+    using_custom_bios: bool,
 }
 
 impl GbaMemory {
@@ -81,6 +85,7 @@ impl GbaMemory {
             gamepak_waitstates: [0u8.into(); 6],
             ewram_waitstates: 2u8.into(),
             sram_waitstates: 8u8.into(),
+            using_custom_bios: false,
         }
     }
 
@@ -97,6 +102,14 @@ impl GbaMemory {
     pub fn set_bios(&mut self, mut bios: Vec<u8>) {
         bios.resize(BIOS_SIZE as usize, 0);
         self.bios = bios.into_boxed_slice().try_into().unwrap();
+        self.using_custom_bios = false;
+    }
+
+    pub fn use_custom_bios(&mut self) {
+        if !self.using_custom_bios {
+            self.set_bios(CUSTOM_BIOS.to_vec());
+            self.using_custom_bios = true;
+        }
     }
 
     pub fn ioregs(&self) -> &IoRegisters {

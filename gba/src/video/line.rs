@@ -72,13 +72,9 @@ impl LineBuffer {
         &mut self.layer_attrs[layer]
     }
 
-    fn color_obj(&self, x: usize, priority: u16, palette: &Palette) -> Option<(u16, PixelAttrs)> {
+    fn color_obj(&self, x: usize, palette: &Palette) -> Option<(u16, PixelAttrs)> {
         let entry = self.pixels[OBJ][x];
         let attrs = PixelAttrs { value: entry as u8 };
-
-        if attrs.priority() != priority {
-            return None;
-        }
 
         let entry = (entry >> 8) as u8;
 
@@ -225,6 +221,7 @@ impl LineBuffer {
                 if ioregs.bldcnt.is_second_target(bg) {
                     attrs.set_second_target();
                 }
+                attrs.set_priority(priority);
 
                 let mask = self.generate_window_mask(bg, ioregs);
 
@@ -238,20 +235,18 @@ impl LineBuffer {
                     }
                 });
             }
+        }
 
-            // FIXME encode priority in pixels (or use a separate array) then use that to calcualte
-            //       this once instead of for each priority.
-            if ioregs.dispcnt.display_obj() {
-                (0..240).for_each(|x| {
-                    if !obj_mask.visible(x) {
-                        return;
-                    }
+        if ioregs.dispcnt.display_obj() {
+            (0..240).for_each(|x| {
+                if !obj_mask.visible(x) {
+                    return;
+                }
 
-                    if let Some((color, attrs)) = self.color_obj(x, priority, palette) {
-                        pixels[x].push(color, attrs.effects_mask(obj_mask.effects(x)));
-                    }
-                });
-            }
+                if let Some((color, attrs)) = self.color_obj(x, palette) {
+                    pixels[x].place_obj(color, attrs.effects_mask(obj_mask.effects(x)));
+                }
+            });
         }
 
         let effect = ioregs.bldcnt.effect();
@@ -341,6 +336,18 @@ impl Pixel {
 
         self.attrs.1 = self.attrs.0;
         self.attrs.0 = attrs;
+    }
+
+    pub fn place_obj(&mut self, color: u16, attrs: PixelAttrs) {
+        if self.attrs.0.priority() <= attrs.priority() {
+            self.push(color, attrs);
+            return;
+        }
+
+        if self.attrs.1.priority() <= attrs.priority() {
+            self.colors.1 = color;
+            self.attrs.1 = attrs;
+        }
     }
 }
 

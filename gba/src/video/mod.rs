@@ -1,7 +1,10 @@
 mod line;
 mod mode0;
+mod mode1;
+mod mode2;
 mod mode3;
 mod mode4;
+mod mode5;
 mod obj;
 mod text;
 
@@ -88,8 +91,11 @@ impl GbaVideo {
 
         match mem.ioregs.dispcnt.bg_mode() {
             0 => mode0::render(line, &mut buf, &mem.ioregs, &mem.vram),
-            3 => mode3::render(line, &mut buf, &mem.vram),
+            1 => mode1::render(line, &mut buf, &mem.ioregs, &mem.vram),
+            2 => mode2::render(line, &mut buf, &mem.ioregs, &mem.vram),
+            3 => mode3::render(line, &mut buf, &mem.ioregs, &mem.vram),
             4 => mode4::render(line, &mut buf, &mem.ioregs, &mem.vram),
+            5 => mode5::render(line, &mut buf, &mem.ioregs, &mem.vram),
             _ => {}
         }
 

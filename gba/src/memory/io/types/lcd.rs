@@ -318,12 +318,6 @@ impl WindowInOut {
     }
 }
 
-bitfields! {
-    pub struct WaitstateControl: u16 {
-        readonly = 0x8000
-    }
-}
-
 util::primitive_enum! {
     pub enum Effect: u16 {
         None = 0,

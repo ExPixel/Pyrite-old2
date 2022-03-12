@@ -38,7 +38,12 @@ impl GbaMemory {
             // Keypad Input
             KEYINPUT => self.ioregs.keyinput,
 
+            // Interrupt, Waitstate, and Power-Down Control
+            IE => self.ioregs.ie_reg.into(),
+            IF => self.ioregs.if_reg.into(),
             WAITCNT => self.ioregs.waitcnt.into(),
+            IME => self.ioregs.ime.into(),
+
             _ => {
                 log::warn!(
                     "attempted to read from unused/readonly IO address 0x{:08X}",
@@ -91,10 +96,14 @@ impl GbaMemory {
             // Keypad Input
             KEYINPUT => { /*NOP */ }
 
+            // Interrupt, Waitstate, and Power-Down Control
+            IE => self.ioregs.ie_reg.set_preserve_bits(value),
+            IF => self.ioregs.if_reg.set_acknowledge(value),
             WAITCNT => {
                 self.ioregs.waitcnt.set_preserve_bits(value);
                 self.update_waitcnt();
             }
+            IME => self.ioregs.ime.set_preserve_bits(value),
 
             _ => {
                 log::warn!(
@@ -177,7 +186,11 @@ pub struct IoRegisters {
     // Keypad Input
     pub(crate) keyinput: u16,
 
+    // Interrupt, Waitstate, and Power-Down Control
+    pub(crate) ie_reg: InterruptEnable,
+    pub(crate) if_reg: InterruptReqAck,
     pub(crate) waitcnt: WaitstateControl,
+    pub(crate) ime: InterruptMasterEnable,
 }
 
 impl IoRegisters {

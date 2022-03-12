@@ -1,21 +1,29 @@
-AS		:= $(DEVKITARM)/bin/arm-none-eabi-as
+ASFLAGS := -mcpu=arm7tdmi -march=armv4t -mthumb-interwork
+AS		:= $(DEVKITARM)/bin/arm-none-eabi-as $(AS_ARGS)
 LD		:= $(DEVKITARM)/bin/arm-none-eabi-ld
 OBJCOPY	:= $(DEVKITARM)/bin/arm-none-eabi-objcopy
 OBJDUMP	:= $(DEVKITARM)/bin/arm-none-eabi-objdump
 
+SOURCES := $(wildcard *.s)
+OBJECTS := $(patsubst %.s,%.o,$(wildcard *.s))
+
 all: bios.bin
+	make clear
 
-bios.o: bios.s
-	$(AS) -mcpu=arm7tdmi -march=armv4t -mthumb-interwork -o $@ $<
+%.o: %.cpp
+	$(AS) $(ASFLAGS) -o $@ $<
 
-bios.elf: bios.o
-	$(LD) --script bios.ld -o $@ $<
+bios.elf: $(OBJECTS)
+	$(LD) --script bios.ld -o $@ $^
 
 bios.bin: bios.elf
 	$(OBJCOPY) -O binary $< $@
 
-.PHONY: clean
-clean:
-	rm -f bios.bin
+.PHONY: clear
+clear:
 	rm -f bios.elf
-	rm -f bios.o
+	rm -f $(OBJECTS)
+
+.PHONY: clean
+clean:	clear
+	rm -f bios.bin

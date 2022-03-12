@@ -256,15 +256,15 @@ macro_rules! de_assign {
 
 impl Memory for GbaMemory {
     fn fetch32(&mut self, address: u32, access: AccessType) -> (u32, Waitstates) {
-        let (opcode, wait) = self.load32(address, access);
         self.allow_bios_access = address <= 0x4004;
+        let (opcode, wait) = self.load32(address, access);
         self.last_opcode = opcode;
         (opcode, wait)
     }
 
     fn fetch16(&mut self, address: u32, access: AccessType) -> (u16, Waitstates) {
-        let (opcode, wait) = self.load16(address, access);
         self.allow_bios_access = address <= 0x4004;
+        let (opcode, wait) = self.load16(address, access);
         self.last_opcode = (self.last_opcode << 16) | opcode as u32;
         (opcode, wait)
     }

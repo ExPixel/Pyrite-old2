@@ -35,7 +35,7 @@ jobs:
         sudo ./install-devkitpro-pacman
     - name: Install GBA Dev tools
       if: steps.cache-devkitpro.outputs.cache-hit != 'true'
-      run: sudo dkp-pacman -Sy devkitARM
+      run: sudo dkp-pacman -S --noconfirm devkitARM
     - name: Run tests
       run: |
         cargo test --verbose -p arm

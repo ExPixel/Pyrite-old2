@@ -11,7 +11,7 @@ pub struct DMARegisters {
 bitfields! {
     pub struct DMAAddress: u32 {
         [0,15]  lo, set_lo: u16,
-        [15,31] hi, set_hi: u16,
+        [16,31] hi, set_hi: u16,
     }
 }
 

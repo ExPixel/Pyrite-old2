@@ -10,6 +10,8 @@ use util::{
     mem::{read_u16, read_u32, write_u16, write_u32},
 };
 
+use crate::scheduler::Scheduler;
+
 use self::{io::IoRegisters, palette::Palette};
 
 pub const REGION_BIOS: u32 = 0x0;
@@ -53,6 +55,8 @@ pub struct GbaMemory {
     pub(crate) oam: Box<[u8; OAM_SIZE as usize]>,
     pub(crate) ioregs: Box<IoRegisters>,
 
+    pub(crate) scheduler: Scheduler,
+
     rom: Vec<u8>,
 
     allow_bios_access: bool,
@@ -67,7 +71,7 @@ pub struct GbaMemory {
 }
 
 impl GbaMemory {
-    pub fn new() -> Self {
+    pub fn new(scheduler: Scheduler) -> Self {
         GbaMemory {
             bios: array::boxed_copied(0),
             ewram: array::boxed_copied(0),
@@ -77,6 +81,8 @@ impl GbaMemory {
             oam: array::boxed_copied(0),
             rom: Vec::new(),
             ioregs: Box::new(IoRegisters::default()),
+
+            scheduler,
 
             allow_bios_access: false,
             last_opcode: 0,
@@ -249,12 +255,6 @@ impl GbaMemory {
         } else {
             self.last_opcode as u8
         }
-    }
-}
-
-impl Default for GbaMemory {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -552,7 +552,7 @@ mod test {
     /// in [`gba_vram_memory_mirrors`].
     #[test]
     pub fn simple_gba_memory_mirrors() {
-        let mut memory = GbaMemory::new();
+        let mut memory = GbaMemory::new(Scheduler::default());
 
         // EWRAM 256K mirrors:
         assert_eq!(memory.load32(0x02000000, AccessType::Seq).0, 0);
@@ -605,7 +605,7 @@ mod test {
     /// ```
     #[test]
     pub fn gba_vram_memory_mirrors() {
-        let mut memory = GbaMemory::new();
+        let mut memory = GbaMemory::new(Scheduler::default());
 
         assert_eq!(memory.load32(0x06000000, AccessType::Seq).0, 0);
         memory.store32(0x06000000, 0xCACBCDCE, AccessType::Seq);

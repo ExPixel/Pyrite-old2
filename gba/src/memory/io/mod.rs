@@ -35,6 +35,32 @@ impl GbaMemory {
             WININ => self.ioregs.wininout.winin(),
             WINOUT => self.ioregs.wininout.winout(),
 
+            // DMA
+            DMA0SAD => self.ioregs.dma[0].source.lo(),
+            DMA0SAD_H => self.ioregs.dma[0].source.hi(),
+            DMA0DAD => self.ioregs.dma[0].destination.lo(),
+            DMA0DAD_H => self.ioregs.dma[0].destination.hi(),
+            DMA0CNT_L => self.ioregs.dma[0].count,
+            DMA0CNT_H => self.ioregs.dma[0].control.into(),
+            DMA1SAD => self.ioregs.dma[1].source.lo(),
+            DMA1SAD_H => self.ioregs.dma[1].source.hi(),
+            DMA1DAD => self.ioregs.dma[1].destination.lo(),
+            DMA1DAD_H => self.ioregs.dma[1].destination.hi(),
+            DMA1CNT_L => self.ioregs.dma[1].count,
+            DMA1CNT_H => self.ioregs.dma[1].control.into(),
+            DMA2SAD => self.ioregs.dma[2].source.lo(),
+            DMA2SAD_H => self.ioregs.dma[2].source.hi(),
+            DMA2DAD => self.ioregs.dma[2].destination.lo(),
+            DMA2DAD_H => self.ioregs.dma[2].destination.hi(),
+            DMA2CNT_L => self.ioregs.dma[2].count,
+            DMA2CNT_H => self.ioregs.dma[2].control.into(),
+            DMA3SAD => self.ioregs.dma[3].source.lo(),
+            DMA3SAD_H => self.ioregs.dma[3].source.hi(),
+            DMA3DAD => self.ioregs.dma[3].destination.lo(),
+            DMA3DAD_H => self.ioregs.dma[3].destination.hi(),
+            DMA3CNT_L => self.ioregs.dma[3].count,
+            DMA3CNT_H => self.ioregs.dma[3].control.into(),
+
             // Keypad Input
             KEYINPUT => self.ioregs.keyinput,
 
@@ -93,6 +119,32 @@ impl GbaMemory {
             WININ => self.ioregs.wininout.set_winin(value),
             WINOUT => self.ioregs.wininout.set_winout(value),
 
+            // DMA
+            DMA0SAD => self.ioregs.dma[0].source.set_lo(value),
+            DMA0SAD_H => self.ioregs.dma[0].source.set_hi(value),
+            DMA0DAD => self.ioregs.dma[0].destination.set_lo(value),
+            DMA0DAD_H => self.ioregs.dma[0].destination.set_hi(value),
+            DMA0CNT_L => self.ioregs.dma[0].count = value,
+            DMA0CNT_H => self.write_to_dma_control(0, value),
+            DMA1SAD => self.ioregs.dma[1].source.set_lo(value),
+            DMA1SAD_H => self.ioregs.dma[1].source.set_hi(value),
+            DMA1DAD => self.ioregs.dma[1].destination.set_lo(value),
+            DMA1DAD_H => self.ioregs.dma[1].destination.set_hi(value),
+            DMA1CNT_L => self.ioregs.dma[1].count = value,
+            DMA1CNT_H => self.write_to_dma_control(1, value),
+            DMA2SAD => self.ioregs.dma[2].source.set_lo(value),
+            DMA2SAD_H => self.ioregs.dma[2].source.set_hi(value),
+            DMA2DAD => self.ioregs.dma[2].destination.set_lo(value),
+            DMA2DAD_H => self.ioregs.dma[2].destination.set_hi(value),
+            DMA2CNT_L => self.ioregs.dma[2].count = value,
+            DMA2CNT_H => self.write_to_dma_control(2, value),
+            DMA3SAD => self.ioregs.dma[3].source.set_lo(value),
+            DMA3SAD_H => self.ioregs.dma[3].source.set_hi(value),
+            DMA3DAD => self.ioregs.dma[3].destination.set_lo(value),
+            DMA3DAD_H => self.ioregs.dma[3].destination.set_hi(value),
+            DMA3CNT_L => self.ioregs.dma[3].count = value,
+            DMA3CNT_H => self.write_to_dma_control(3, value),
+
             // Keypad Input
             KEYINPUT => { /*NOP */ }
 
@@ -121,6 +173,26 @@ impl GbaMemory {
         value16 &= !0xFF << shift;
         value16 |= (value as u16) << shift;
         self.store16_io(address, value16)
+    }
+
+    fn write_to_dma_control(&mut self, dma: usize, value: u16) {
+        use crate::dma;
+
+        let old_value = self.ioregs.dma[dma].control;
+        self.ioregs.dma[dma].control.set_preserve_bits(value);
+
+        if !old_value.enabled() && self.ioregs.dma[dma].control.enabled() {
+            self.scheduler.schedule(
+                match dma {
+                    0 => dma::dma_enabled::<0>,
+                    1 => dma::dma_enabled::<1>,
+                    2 => dma::dma_enabled::<2>,
+                    3 => dma::dma_enabled::<3>,
+                    _ => unreachable!("invalid DMA index"),
+                },
+                0,
+            );
+        }
     }
 
     pub(super) fn update_waitcnt(&mut self) {
@@ -182,6 +254,9 @@ pub struct IoRegisters {
     pub(crate) bldcnt: ColorSpecialEffects,
     pub(crate) bldalpha: AlphaBlendingCoeff,
     pub(crate) bldy: BrightnessCoeff,
+
+    // DMA
+    pub(crate) dma: [DMARegisters; 4],
 
     // Keypad Input
     pub(crate) keyinput: u16,

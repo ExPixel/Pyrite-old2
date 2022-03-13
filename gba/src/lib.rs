@@ -1,8 +1,10 @@
+mod dma;
 mod interrupts;
 pub mod memory;
 mod scheduler;
 mod video;
 
+use dma::GbaDMA;
 pub use memory::GbaMemory;
 
 use arm::Cpu;
@@ -13,8 +15,10 @@ pub use video::{GbaVideo, SCREEN_HEIGHT, SCREEN_PIXEL_COUNT, SCREEN_WIDTH};
 pub struct Gba {
     mem: GbaMemory,
     cpu: Cpu,
+    dma: [GbaDMA; 4],
     video: GbaVideo,
     scheduler: Scheduler,
+    step_fn: fn(&mut Self) -> arm::Cycles,
 }
 
 impl Gba {
@@ -22,10 +26,17 @@ impl Gba {
         let scheduler = Scheduler::default();
 
         Gba {
-            mem: GbaMemory::new(),
+            mem: GbaMemory::new(scheduler.clone()),
             cpu: Cpu::uninitialized(arm::Isa::Arm, arm::CpuMode::System),
+            dma: [
+                GbaDMA::default(),
+                GbaDMA::default(),
+                GbaDMA::default(),
+                GbaDMA::default(),
+            ],
             video: GbaVideo::new(scheduler.clone()),
             scheduler,
+            step_fn: Self::step_cpu,
         }
     }
 
@@ -52,8 +63,12 @@ impl Gba {
         }
     }
 
+    fn step_cpu(&mut self) -> arm::Cycles {
+        self.cpu.step(&mut self.mem)
+    }
+
     pub fn step(&mut self) {
-        let mut cycles = self.cpu.step(&mut self.mem);
+        let mut cycles = (self.step_fn)(self);
 
         while let Some((event, next_cycles)) = self.scheduler.advance(cycles) {
             cycles = next_cycles;

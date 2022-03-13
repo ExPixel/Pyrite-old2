@@ -29,6 +29,23 @@ bitfields! {
 }
 
 impl InterruptReqAck {
+    pub fn request(&mut self, interrupt: Interrupt) {
+        self.value |= 1 << u8::from(interrupt);
+    }
+
+    /// Inherits IRQ requests from another [`InterruptReqAck`]
+    pub fn inherit(&mut self, other: InterruptReqAck) {
+        self.set_preserve_bits(self.value | other.value);
+    }
+
+    pub fn clear(&mut self) {
+        self.value.replace_bits(0, 13, 0);
+    }
+
+    pub fn has_requests(&self) -> bool {
+        self.value.bits(0, 13) != 0
+    }
+
     /// Interrupts can be acknowledged by writing a one to one of the IRQ bits.
     pub fn set_acknowledge(&mut self, value: u16) {
         self.value &= !value;

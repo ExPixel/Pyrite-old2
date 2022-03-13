@@ -1,3 +1,4 @@
+mod interrupts;
 pub mod memory;
 mod scheduler;
 mod video;

@@ -191,6 +191,9 @@ pub struct IoRegisters {
     pub(crate) if_reg: InterruptReqAck,
     pub(crate) waitcnt: WaitstateControl,
     pub(crate) ime: InterruptMasterEnable,
+
+    /// This is NOT a register but a temporary location for pending interrupts.
+    pub(crate) irq_pending: InterruptReqAck,
 }
 
 impl IoRegisters {

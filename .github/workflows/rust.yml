@@ -16,8 +16,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
     - name: Install devkitPro Pacman
       run: |
         wget https://apt.devkitpro.org/install-devkitpro-pacman
@@ -26,7 +24,10 @@ jobs:
     - name: Install GBA Dev tools
       run: sudo pacman -S gba-dev
     - name: Run tests
-      run: cargo test --verbose
+      run: |
+        cargo test --verbose -p arm
+        cargo test --verbose -p gba
+        cargo test --verbose -p pyrite
       env:
         DEVKITPRO: /opt/devkitpro
         DEVKITARM: /opt/devkitpro/devkitARM

@@ -37,8 +37,8 @@ bitfields! {
         [7,8]   src_addr_control, set_src_addr_control: AddressControl,
         [9]     repeat, set_repeat: bool,
         [10]    transfer_type, set_transfer_type: TransferType,
-        [12]    gamepak_drq, set_gamepak_drq: bool,
-        [13]    timing, set_timing: Timing,
+        [11]    gamepak_drq, set_gamepak_drq: bool,
+        [12,13] timing, set_timing: Timing,
         [14]    irq, set_irq: bool,
         [15]    enabled, set_enabled: bool,
     }
@@ -46,7 +46,7 @@ bitfields! {
 
 primitive_enum! {
     pub enum Timing: u16 {
-        Immediate,
+        Immediate = 0,
         VBlank,
         HBlank,
         Special,

@@ -10,7 +10,7 @@ mod text;
 
 use arm::Cycles;
 
-use crate::{scheduler::Scheduler, GbaMemory};
+use crate::{dma::dma_on_timing, scheduler::Scheduler, GbaMemory};
 
 use self::line::LineBuffer;
 
@@ -39,7 +39,12 @@ impl GbaVideo {
     fn enter_hdraw(&mut self, mem: &mut GbaMemory, late: Cycles) {
         mem.ioregs.dispstat.set_hblank(false);
         self.scheduler.schedule(
-            |gba, late| gba.video.enter_hblank(&mut gba.mem, late),
+            |gba, late| {
+                if gba.mem.ioregs.vcount < 160 {
+                    dma_on_timing(gba, crate::memory::io::Timing::HBlank);
+                }
+                gba.video.enter_hblank(&mut gba.mem, late);
+            },
             HDRAW_CYCLES - late,
         );
     }
@@ -81,7 +86,12 @@ impl GbaVideo {
         }
 
         self.scheduler.schedule(
-            |gba, late| gba.video.exit_hblank(&mut gba.mem, late),
+            |gba, late| {
+                gba.video.exit_hblank(&mut gba.mem, late);
+                if gba.mem.ioregs.vcount == 160 {
+                    dma_on_timing(gba, crate::memory::io::Timing::VBlank)
+                }
+            },
             HBLANK_CYCLES - late,
         );
     }

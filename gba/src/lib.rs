@@ -67,6 +67,12 @@ impl Gba {
         self.cpu.step(&mut self.mem)
     }
 
+    fn restore_step(&mut self) {
+        // FIXME evetually this should handle going into an IDLE state if the
+        //       CPU is waiting for an interrupt or something.
+        self.step_fn = Self::step_cpu;
+    }
+
     pub fn step(&mut self) {
         let mut cycles = (self.step_fn)(self);
 

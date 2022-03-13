@@ -19,12 +19,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: Cache devkitpro
+      id: cache-devkitpro
+      uses: actions/cache@v2
+      with:
+        path: /opt/devkitpro
+        key: ${{ runner.os }}-devkitpro
+
     - name: Install devkitPro Pacman
+      if: steps.cache-devkitpro.outputs.cache-hit != 'true'
       run: |
         wget https://apt.devkitpro.org/install-devkitpro-pacman
         chmod +x ./install-devkitpro-pacman
         sudo ./install-devkitpro-pacman
     - name: Install GBA Dev tools
+      if: steps.cache-devkitpro.outputs.cache-hit != 'true'
       run: sudo dkp-pacman -Sy devkitARM
     - name: Run tests
       run: |

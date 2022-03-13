@@ -1,17 +1,26 @@
-ASFLAGS := -mcpu=arm7tdmi -march=armv4t -mthumb-interwork
-AS		:= $(DEVKITARM)/bin/arm-none-eabi-as $(AS_ARGS)
-LD		:= $(DEVKITARM)/bin/arm-none-eabi-ld
-OBJCOPY	:= $(DEVKITARM)/bin/arm-none-eabi-objcopy
-OBJDUMP	:= $(DEVKITARM)/bin/arm-none-eabi-objdump
+ASFLAGS     := -mcpu=arm7tdmi -march=armv4t -mthumb-interwork
+CFLAGS      := -ffreestanding -static -nostdlib -c -O3
+AS          := $(DEVKITARM)/bin/arm-none-eabi-as
+CC          := $(DEVKITARM)/bin/arm-none-eabi-gcc
+LD          := $(DEVKITARM)/bin/arm-none-eabi-ld
+OBJCOPY     := $(DEVKITARM)/bin/arm-none-eabi-objcopy
+OBJDUMP     := $(DEVKITARM)/bin/arm-none-eabi-objdump
 
-SOURCES := $(wildcard *.s)
-OBJECTS := $(patsubst %.s,%.o,$(wildcard *.s))
+AS_SOURCES  := $(wildcard *.s)
+AS_OBJECTS  := $(patsubst %.s,%.o,$(AS_SOURCES))
+
+C_SOURCES   := $(wildcard *.c)
+C_OBJECTS   := $(patsubst %.c,%.o,$(C_SOURCES))
+
+OBJECTS     := $(AS_OBJECTS) $(C_OBJECTS)
 
 all: bios.bin
 	make clear
 
-%.o: %.cpp
+%.o: %.s
 	$(AS) $(ASFLAGS) -o $@ $<
+%o: %.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 bios.elf: $(OBJECTS)
 	$(LD) --script bios.ld -o $@ $^

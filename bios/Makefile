@@ -1,5 +1,5 @@
 ASFLAGS     := -mcpu=arm7tdmi -march=armv4t -mthumb-interwork
-CFLAGS      := -ffreestanding -static -nostdlib -c -O3
+CFLAGS      := -mcpu=arm7tdmi -march=armv4t -mthumb-interwork -ffreestanding -static -nostdlib -c -O0
 AS          := $(DEVKITARM)/bin/arm-none-eabi-as
 CC          := $(DEVKITARM)/bin/arm-none-eabi-gcc
 LD          := $(DEVKITARM)/bin/arm-none-eabi-ld

@@ -1,2 +1,2 @@
-bios.elf
-bios.o
+*.elf
+*.o

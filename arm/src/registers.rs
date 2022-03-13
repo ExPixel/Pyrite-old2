@@ -496,7 +496,7 @@ impl Registers {
 
                 CpuMode::User | CpuMode::System => { /* NOP */ }
 
-                _ => unreachable!("bad old cpu mode in on_mode_switch: {old_mode}"),
+                _ => unreachable!("bad old cpu mode in on_mode_switch: {old_mode:?}"),
             }
         }
 
@@ -540,7 +540,7 @@ impl Registers {
 
             CpuMode::User | CpuMode::System => { /* NOP */ }
 
-            _ => unreachable!("bad new cpu mode in on_mode_switch: {new_mode}"),
+            _ => unreachable!("bad new cpu mode in on_mode_switch: {new_mode:?}"),
         }
     }
 }

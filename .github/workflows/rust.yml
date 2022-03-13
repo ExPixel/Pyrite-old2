@@ -22,7 +22,7 @@ jobs:
         chmod +x ./install-devkitpro-pacman
         sudo ./install-devkitpro-pacman
     - name: Install GBA Dev tools
-      run: sudo pacman -S gba-dev
+      run: sudo dkp-pacman -S gba-dev
     - name: Run tests
       run: |
         cargo test --verbose -p arm

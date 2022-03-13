@@ -54,14 +54,13 @@ impl Cpu {
     pub fn uninitialized(isa: Isa, mode: CpuMode) -> Self {
         let mut registers = Registers::new(mode);
 
-        let noop_opcode;
-        if isa == Isa::Thumb {
+        let noop_opcode = if isa == Isa::Thumb {
             registers.setf_t();
-            noop_opcode = THUMB_NOOP_OPCODE as u32;
+            THUMB_NOOP_OPCODE as u32
         } else {
             registers.clearf_t();
-            noop_opcode = ARM_NOOP_OPCODE;
-        }
+            ARM_NOOP_OPCODE
+        };
 
         Cpu {
             registers,

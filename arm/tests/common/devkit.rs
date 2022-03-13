@@ -4,7 +4,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-fn devkit_arm() -> &'static Path {
+fn devkit_arm_bin() -> &'static Path {
     static DEVKIT_ARM: OnceCell<PathBuf> = OnceCell::new();
 
     DEVKIT_ARM.get_or_init(|| {
@@ -33,7 +33,22 @@ fn devkit_arm() -> &'static Path {
             panic!("DEVKITARM path {} does not exist", path.display());
         }
 
-        path
+        // If we find as in the root DEVKITARM directory, just use that.
+        if path.join("arm-none-eabi-as").exists() || path.join("arm-none-eabi-as.exe").exists() {
+            return path;
+        }
+
+        // Try to find as in a /bin subdirectory:
+        path = path.join("bin");
+        if path.join("arm-none-eabi-as").exists() || path.join("arm-none-eabi-as.exe").exists() {
+            return path;
+        }
+
+        panic!(
+            "Unable to find arm-none-eabi-as in `{}` or `{}/bin`",
+            path.display(),
+            path.display()
+        );
     })
 }
 
@@ -151,8 +166,7 @@ fn run_program<P: AsRef<OsStr>>(
 }
 
 fn run_arm_program(program: &str, args: &[&str]) -> std::io::Result<std::process::ExitStatus> {
-    let mut p = devkit_arm().join("arm-none-eabi/bin");
-    p.push(program);
+    let p = devkit_arm_bin().join(format!("arm-none-eabi-{program}"));
     run_program(p, args)
 }
 

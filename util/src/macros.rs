@@ -30,7 +30,10 @@ macro_rules! primitive_enum {
 
         impl From<$PrimitiveType> for $Name {
             fn from(primitive: $PrimitiveType) -> $Name {
-                unsafe { std::mem::transmute(primitive) }
+                match primitive {
+                    $(_ if primitive == Self::$Variant as $PrimitiveType => Self::$Variant,)*
+                    _ => panic!("{} is not a valid {}", primitive, stringify!($Name)),
+                }
             }
         }
 

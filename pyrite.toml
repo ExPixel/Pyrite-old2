@@ -3,3 +3,5 @@ vsync = true
 fps = 60
 
 [gba]
+bios_path = "roms/bios.bin"
+boot_from_bios = false

@@ -2,12 +2,13 @@ mod dma;
 mod interrupts;
 pub mod memory;
 mod scheduler;
+mod timers;
 mod video;
 
 use dma::GbaDMA;
 pub use memory::GbaMemory;
 
-use arm::Cpu;
+use arm::{Cpu, Memory};
 use scheduler::Scheduler;
 use util::bits::Bits;
 pub use video::{GbaVideo, SCREEN_HEIGHT, SCREEN_PIXEL_COUNT, SCREEN_WIDTH};
@@ -40,11 +41,49 @@ impl Gba {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, boot_from_bios: bool) {
         self.mem.init();
         self.video.init(&mut self.mem);
-        self.mem.use_custom_bios();
-        self.cpu.branch(0x0, &mut self.mem);
+
+        if boot_from_bios {
+            self.cpu.branch(0x0, &mut self.mem);
+        } else {
+            self.emulate_boot()
+        }
+    }
+
+    fn emulate_boot(&mut self) {
+        self.cpu.registers.write_mode(arm::CpuMode::Supervisor);
+        self.cpu.registers.write(13, 0x3007FE0); // sp_svc = 0x3007FE0
+        self.cpu.registers.write(14, 0); // lr_svc = 0
+        self.cpu.registers.write_spsr(0); // spsr_svc = 0
+
+        self.cpu.registers.write_mode(arm::CpuMode::IRQ);
+        self.cpu.registers.write(13, 0x3007FA0); // sp_irq = 0x3007FA0
+        self.cpu.registers.write(14, 0); // lr_irq = 0
+        self.cpu.registers.write_spsr(0); // spsr_irq = 0
+
+        self.cpu.registers.write_mode(arm::CpuMode::System);
+        self.cpu.registers.write(13, 0x3007F00); // sp_sys = 0x3007F00
+
+        // r0-r12 = 0
+        (0..=12).for_each(|r| self.cpu.registers.write(r, 0));
+
+        // zero fill 512 byte region [3007E00h, 3007FFFh]
+        (0u32..0x200).for_each(|idx| {
+            self.mem.store8(0x3007E00 + idx, 0, arm::AccessType::Seq);
+        });
+
+        self.cpu.registers.clearf_t();
+        self.cpu.branch(0x08000000, &mut self.mem);
+    }
+
+    pub fn set_bios(&mut self, bios: Option<Vec<u8>>) {
+        if let Some(bios) = bios {
+            self.mem.set_bios(bios);
+        } else {
+            self.mem.use_custom_bios();
+        }
     }
 
     pub fn set_gamepak(&mut self, cart: Vec<u8>) {

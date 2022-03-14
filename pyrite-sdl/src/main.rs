@@ -79,9 +79,23 @@ fn run() -> anyhow::Result<()> {
     let gba = pyrite::GbaHandle::new();
 
     let rom = get_rom_from_args().context("error occurred retrieving ROM from args")?;
+    let bios = config.gba.bios_path.and_then(|path| {
+        match std::fs::read(&path)
+            .with_context(|| format!("failed to read path {}", path.display()))
+        {
+            Ok(data) => Some(data),
+            Err(err) => {
+                log::error!("error occurred while loading BIOS: {:?}", err);
+                None
+            }
+        }
+    });
+    let boot_from_bios = config.gba.boot_from_bios.unwrap_or(true);
+
     gba.after_frame_wait(move |gba, _| {
         gba.set_gamepak(rom);
-        gba.reset();
+        gba.set_bios(bios);
+        gba.reset(boot_from_bios);
     });
 
     let mut buttons = ButtonSet::default();

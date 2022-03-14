@@ -26,12 +26,17 @@ impl Default for GraphicsConfig {
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct GbaConfig {}
+pub struct GbaConfig {
+    pub bios_path: Option<PathBuf>,
+    pub boot_from_bios: Option<bool>,
+}
 
-#[allow(clippy::derivable_impls)]
 impl Default for GbaConfig {
-    fn default() -> GbaConfig {
-        GbaConfig {}
+    fn default() -> Self {
+        GbaConfig {
+            bios_path: None,
+            boot_from_bios: Some(true),
+        }
     }
 }
 

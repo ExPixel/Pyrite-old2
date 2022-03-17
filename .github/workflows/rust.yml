@@ -23,8 +23,7 @@ jobs:
       if: steps.cache-devkitpro.outputs.cache-hit != 'true'
       run: |
         sudo apt install -y gcc-arm-none-eabi
-    - name: Run tests
-      run: |
-        cargo test --verbose -p arm
-        cargo test --verbose -p gba
-        cargo test --verbose -p pyrite
+    - name: Run ARM Tests
+      run: cargo test --verbose -p arm
+    - name: Run GBA Tests
+      run: cargo test --verbose -p gba

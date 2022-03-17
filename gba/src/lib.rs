@@ -114,6 +114,7 @@ impl Gba {
 
     pub fn step(&mut self) {
         let mut cycles = (self.step_fn)(self);
+        self.mem.ioregs.time += u32::from(cycles) as u64;
 
         while let Some((event, next_cycles)) = self.scheduler.advance(cycles) {
             cycles = next_cycles;

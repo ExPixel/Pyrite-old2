@@ -2,7 +2,7 @@ use arm::CpuException;
 
 use crate::{
     memory::io::{Interrupt, IoRegisters},
-    scheduler::Scheduler,
+    scheduler::{EventTag, Scheduler},
     Gba,
 };
 
@@ -12,12 +12,12 @@ pub fn raise(interrupt: Interrupt, ioregs: &mut IoRegisters, scheduler: &Schedul
     }
 
     if !ioregs.irq_pending.has_requests() {
-        scheduler.schedule(|gba, _| process_irq(gba), 0);
+        scheduler.schedule(process_irq, 0, EventTag::IRQ);
     }
     ioregs.irq_pending.request(interrupt);
 }
 
-fn process_irq(gba: &mut Gba) {
+fn process_irq(gba: &mut Gba, _late: arm::Cycles) {
     let pending = gba.mem.ioregs.irq_pending;
     gba.mem.ioregs.irq_pending.clear();
 

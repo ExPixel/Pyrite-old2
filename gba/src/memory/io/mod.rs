@@ -1,20 +1,22 @@
 mod constants;
 mod types;
 
+use crate::scheduler::{EventFn, EventTag};
+
 use super::GbaMemory;
 pub use constants::*;
 pub use types::*;
 use util::bits::Bits as _;
 
 impl GbaMemory {
-    pub(super) fn load32_io<const SIDE_EFFECTS: bool>(&self, address: u32) -> u32 {
+    pub(super) fn load32_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u32 {
         let lo = self.load16_io::<SIDE_EFFECTS>(address) as u32;
         let hi = self.load16_io::<SIDE_EFFECTS>(address + 2) as u32;
 
         lo | (hi << 16)
     }
 
-    pub(super) fn load16_io<const SIDE_EFFECTS: bool>(&self, address: u32) -> u16 {
+    pub(super) fn load16_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u16 {
         match address {
             // LCD
             DISPCNT => self.ioregs.dispcnt.into(),
@@ -60,6 +62,16 @@ impl GbaMemory {
             DMA3DAD_H => self.ioregs.dma[3].destination.hi(),
             DMA3CNT_L => self.ioregs.dma[3].count,
             DMA3CNT_H => self.ioregs.dma[3].control.into(),
+
+            // Timers
+            TM0CNT_L => self.read_timer_counter(0),
+            TM0CNT_H => self.ioregs.timers[0].control.into(),
+            TM1CNT_L => self.read_timer_counter(1),
+            TM1CNT_H => self.ioregs.timers[1].control.into(),
+            TM2CNT_L => self.read_timer_counter(2),
+            TM2CNT_H => self.ioregs.timers[2].control.into(),
+            TM3CNT_L => self.read_timer_counter(3),
+            TM3CNT_H => self.ioregs.timers[3].control.into(),
 
             // Keypad Input
             KEYINPUT => self.ioregs.keyinput,
@@ -145,6 +157,16 @@ impl GbaMemory {
             DMA3CNT_L => self.ioregs.dma[3].count = value,
             DMA3CNT_H => self.write_to_dma_control(3, value),
 
+            // Timers
+            TM0CNT_L => self.write_to_timer_reload(0, value),
+            TM0CNT_H => self.write_to_timer_cotrol(0, value),
+            TM1CNT_L => self.write_to_timer_reload(1, value),
+            TM1CNT_H => self.write_to_timer_cotrol(1, value),
+            TM2CNT_L => self.write_to_timer_reload(2, value),
+            TM2CNT_H => self.write_to_timer_cotrol(2, value),
+            TM3CNT_L => self.write_to_timer_reload(3, value),
+            TM3CNT_H => self.write_to_timer_cotrol(3, value),
+
             // Keypad Input
             KEYINPUT => { /*NOP */ }
 
@@ -175,6 +197,39 @@ impl GbaMemory {
         self.store16_io(address, value16)
     }
 
+    fn write_to_timer_reload(&mut self, timer: usize, value: u16) {
+        self.ioregs.timers[timer].set_reload(value);
+    }
+
+    fn write_to_timer_cotrol(&mut self, timer: usize, new: u16) {
+        let old = self.ioregs.timers[timer].control;
+        let new = TimerControl::new(new);
+
+        let prescaler_changed = old.prescaler() != new.prescaler();
+        let count_up_changed = old.count_up_timing() != new.count_up_timing();
+
+        if old.started() && new.started() && (prescaler_changed || count_up_changed) {
+            crate::timers::flush(&mut self.ioregs.timers[timer], self.ioregs.time);
+        }
+
+        self.ioregs.timers[timer]
+            .control
+            .set_preserve_bits(new.value);
+
+        if !old.started() && new.started() {
+            crate::timers::started(timer, &mut self.ioregs, &self.scheduler);
+        } else if old.started() && !new.started() {
+            crate::timers::stopped(timer, &mut self.ioregs.timers, &self.scheduler);
+        } else if new.started() && count_up_changed {
+            crate::timers::reschedule(timer, &mut self.ioregs.timers, &self.scheduler);
+        }
+    }
+
+    fn read_timer_counter(&mut self, timer: usize) -> u16 {
+        crate::timers::flush(&mut self.ioregs.timers[timer], self.ioregs.time);
+        self.ioregs.timers[timer].counter()
+    }
+
     fn write_to_dma_control(&mut self, dma: usize, value: u16) {
         use crate::dma;
 
@@ -182,16 +237,15 @@ impl GbaMemory {
         self.ioregs.dma[dma].control.set_preserve_bits(value);
 
         if !old_value.enabled() && self.ioregs.dma[dma].control.enabled() {
-            self.scheduler.schedule(
-                match dma {
-                    0 => dma::dma_enabled::<0>,
-                    1 => dma::dma_enabled::<1>,
-                    2 => dma::dma_enabled::<2>,
-                    3 => dma::dma_enabled::<3>,
-                    _ => unreachable!("invalid DMA index"),
-                },
-                0,
-            );
+            let (event_fn, event_tag): (EventFn, EventTag) = match dma {
+                0 => (dma::dma_enabled::<0>, EventTag::DMA0),
+                1 => (dma::dma_enabled::<1>, EventTag::DMA1),
+                2 => (dma::dma_enabled::<2>, EventTag::DMA2),
+                3 => (dma::dma_enabled::<3>, EventTag::DMA3),
+                _ => unreachable!("invalid DMA index"),
+            };
+
+            self.scheduler.schedule(event_fn, 0, event_tag);
         }
     }
 
@@ -257,6 +311,14 @@ pub struct IoRegisters {
 
     // DMA
     pub(crate) dma: [DMARegisters; 4],
+
+    // Timers
+    pub(crate) timers: [Timer; 4],
+
+    /// This is the current time counted in cycles.
+    /// This is NOT a register but it makes the most sense to use it here
+    /// as it is used as the internal clock for timers.
+    pub(crate) time: u64,
 
     // Keypad Input
     pub(crate) keyinput: u16,

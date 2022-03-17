@@ -4,6 +4,47 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum EventTag {
+    HDraw,
+    HBlank,
+
+    Timer0,
+    Timer1,
+    Timer2,
+    Timer3,
+
+    DMA0,
+    DMA1,
+    DMA2,
+    DMA3,
+
+    IRQ,
+}
+
+impl EventTag {
+    pub fn timer(timer: usize) -> EventTag {
+        match timer {
+            0 => EventTag::Timer0,
+            1 => EventTag::Timer1,
+            2 => EventTag::Timer2,
+            3 => EventTag::Timer3,
+            _ => panic!("invalid timer for event tag"),
+        }
+    }
+
+    // pub fn dma(dma: usize) -> EventTag {
+    //     match dma {
+    //         0 => EventTag::DMA0,
+    //         1 => EventTag::DMA1,
+    //         2 => EventTag::DMA2,
+    //         3 => EventTag::DMA3,
+    //         _ => panic!("invalid DMA channel for event tag"),
+    //     }
+    // }
+}
+
 pub type EventFn = fn(gba: &mut Gba, late: Cycles);
 
 #[derive(Default, Clone)]
@@ -12,11 +53,16 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn schedule(&self, callback: EventFn, cycles: impl Into<Cycles>) {
+    pub fn schedule(&self, callback: EventFn, cycles: impl Into<Cycles>, tag: EventTag) {
         self.inner.borrow_mut().schedule(Event {
             callback,
             cycles_remaining: cycles.into(),
+            tag,
         });
+    }
+
+    pub fn unschedule(&self, tag: EventTag) {
+        self.inner.borrow_mut().unschedule(tag);
     }
 
     pub fn advance(&self, cycles: impl Into<Cycles>) -> Option<(EventFn, Cycles)> {
@@ -34,6 +80,7 @@ impl Scheduler {
 pub struct Event {
     callback: EventFn,
     cycles_remaining: Cycles,
+    tag: EventTag,
 }
 
 #[derive(Default)]
@@ -55,6 +102,10 @@ impl Inner {
         self.events.insert(insert_idx, new_event);
     }
 
+    fn unschedule(&mut self, tag: EventTag) {
+        self.events.retain(|event| event.tag != tag);
+    }
+
     fn advance(&mut self, cycles: Cycles) -> Option<(EventFn, Cycles)> {
         if let Some(event) = self.events.front_mut() {
             if event.cycles_remaining > cycles {
@@ -74,7 +125,7 @@ impl Inner {
 mod test {
     use arm::Cycles;
 
-    use crate::Gba;
+    use crate::{scheduler::EventTag, Gba};
 
     use super::Scheduler;
 
@@ -83,10 +134,10 @@ mod test {
         let mut gba = Gba::default();
         let scheduler = Scheduler::default();
 
-        scheduler.schedule(|_, _| data()[0] = 1, 10u32);
-        scheduler.schedule(|_, _| data()[3] = 1, 17u32);
-        scheduler.schedule(|_, _| data()[1] = 1, 13u32);
-        scheduler.schedule(|_, _| data()[2] = 1, 13u32);
+        scheduler.schedule(|_, _| data()[0] = 1, 10u32, EventTag::HBlank);
+        scheduler.schedule(|_, _| data()[3] = 1, 17u32, EventTag::HBlank);
+        scheduler.schedule(|_, _| data()[1] = 1, 13u32, EventTag::HBlank);
+        scheduler.schedule(|_, _| data()[2] = 1, 13u32, EventTag::HBlank);
         scheduler.dump();
 
         assert!(scheduler.advance(6u32).is_none());

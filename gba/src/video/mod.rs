@@ -10,7 +10,11 @@ mod text;
 
 use arm::Cycles;
 
-use crate::{dma::dma_on_timing, scheduler::Scheduler, GbaMemory};
+use crate::{
+    dma::dma_on_timing,
+    scheduler::{EventTag, Scheduler},
+    Gba, GbaMemory,
+};
 
 use self::line::LineBuffer;
 
@@ -38,15 +42,15 @@ impl GbaVideo {
 
     fn enter_hdraw(&mut self, mem: &mut GbaMemory, late: Cycles) {
         mem.ioregs.dispstat.set_hblank(false);
-        self.scheduler.schedule(
-            |gba, late| {
-                if gba.mem.ioregs.vcount < 160 {
-                    dma_on_timing(gba, crate::memory::io::Timing::HBlank);
-                }
-                gba.video.enter_hblank(&mut gba.mem, late);
-            },
-            HDRAW_CYCLES - late,
-        );
+        self.scheduler
+            .schedule(Self::hblank_callback, HDRAW_CYCLES - late, EventTag::HBlank);
+    }
+
+    fn hblank_callback(gba: &mut Gba, late: arm::Cycles) {
+        if gba.mem.ioregs.vcount < 160 {
+            dma_on_timing(gba, crate::memory::io::Timing::HBlank);
+        }
+        gba.video.enter_hblank(&mut gba.mem, late);
     }
 
     fn exit_hblank(&mut self, mem: &mut GbaMemory, late: Cycles) {
@@ -85,15 +89,15 @@ impl GbaVideo {
             Self::render_line(line, output_buf, mem);
         }
 
-        self.scheduler.schedule(
-            |gba, late| {
-                gba.video.exit_hblank(&mut gba.mem, late);
-                if gba.mem.ioregs.vcount == 160 {
-                    dma_on_timing(gba, crate::memory::io::Timing::VBlank)
-                }
-            },
-            HBLANK_CYCLES - late,
-        );
+        self.scheduler
+            .schedule(Self::hdraw_callback, HBLANK_CYCLES - late, EventTag::HDraw);
+    }
+
+    fn hdraw_callback(gba: &mut Gba, late: arm::Cycles) {
+        gba.video.exit_hblank(&mut gba.mem, late);
+        if gba.mem.ioregs.vcount == 160 {
+            dma_on_timing(gba, crate::memory::io::Timing::VBlank)
+        }
     }
 
     fn render_line(line: u16, output: &mut [u16], mem: &GbaMemory) {

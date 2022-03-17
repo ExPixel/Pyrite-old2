@@ -178,6 +178,11 @@ impl GbaMemory {
                 self.update_waitcnt();
             }
             IME => self.ioregs.ime.set_preserve_bits(value),
+            IME_HI => {
+                // This write doesn't do anything but it happens often enough
+                // (because IME is addressed as a 32bit register) that this implementation
+                // is needed to reduce noise.
+            }
 
             _ => {
                 log::warn!(

@@ -139,3 +139,45 @@ impl Bits for u64 {
         (((self << (Self::BITS as Self - bits as Self)) as Self::Signed) >> (32 - bits)) as Self
     }
 }
+
+impl Bits for u8 {
+    const BITS: u32 = 8;
+    type Signed = i8;
+    type Unsigned = Self;
+
+    #[inline(always)]
+    fn bits(self, start: u32, end: u32) -> Self {
+        (self >> start) & ((1 << (end - start + 1)) - 1)
+    }
+
+    #[inline(always)]
+    fn bits_from(self, start: u32) -> Self {
+        (self >> start) & 1
+    }
+
+    #[inline(always)]
+    fn bit(self, offset: u32) -> Self {
+        (self >> offset) & 1
+    }
+
+    #[inline(always)]
+    fn is_bit_set(self, offset: u32) -> bool {
+        self.bit(offset) != 0
+    }
+
+    #[inline(always)]
+    fn replace_bits(self, start: u32, end: u32, value: Self) -> Self {
+        (self & !(((1 << (end - start + 1)) - 1) << start))
+            | ((value & ((1 << (end - start + 1)) - 1)) << start)
+    }
+
+    #[inline(always)]
+    fn replace_bit(self, offset: u32, value: bool) -> Self {
+        self.replace_bits(offset, offset, value as Self)
+    }
+
+    #[inline(always)]
+    fn sign_extend(self, bits: u32) -> Self {
+        (((self << (Self::BITS as Self - bits as Self)) as Self::Signed) >> (32 - bits)) as Self
+    }
+}

@@ -9,6 +9,7 @@ use std::{
 use anyhow::{Context as _, Error};
 use gba::{Button, ButtonSet};
 use sdl2::{
+    audio::{AudioCallback, AudioSpec, AudioSpecDesired},
     event::Event,
     keyboard::Keycode,
     pixels::{Color, PixelFormatEnum},
@@ -46,6 +47,22 @@ fn run() -> anyhow::Result<()> {
         .video()
         .map_err(Error::msg)
         .context("failed to initialize SDL video")?;
+    let audio_subsystem = sdl_context
+        .audio()
+        .map_err(Error::msg)
+        .context("failed to initialize SDL audio")?;
+
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(1),
+        samples: None,
+    };
+    let device = audio_subsystem
+        .open_playback(None, &desired_spec, |spec| GbaAudio { spec })
+        .map_err(Error::msg)
+        .context("failed to open audio playback")?;
+    device.resume();
+
     let window = video_subsystem
         .window("Pyrite", 480, 320)
         .position_centered()
@@ -220,6 +237,7 @@ fn run() -> anyhow::Result<()> {
         }
     }
 
+    device.pause();
     gba.set_paused(true);
     gba.after_frame_wait(|gba, _| {
         log::debug!(
@@ -232,6 +250,29 @@ fn run() -> anyhow::Result<()> {
     log::info!("exiting...");
 
     Ok(())
+}
+
+pub struct GbaAudio {
+    spec: AudioSpec,
+}
+
+impl AudioCallback for GbaAudio {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [Self::Channel]) {
+        static mut PHASE: f32 = 0.0;
+        static VOLUME: f32 = 0.001;
+
+        let phase_inc = 440.0 / self.spec.freq as f32;
+        out.iter_mut().for_each(|sample| {
+            *sample = if unsafe { PHASE } <= 0.5 {
+                VOLUME
+            } else {
+                -VOLUME
+            };
+            unsafe { PHASE = (PHASE + phase_inc) % 1.0 };
+        });
+    }
 }
 
 fn get_rom_from_args() -> anyhow::Result<Vec<u8>> {

@@ -44,7 +44,7 @@ pub const PAL_MASK: u32 = 0x3FF;
 pub const OAM_MASK: u32 = 0x3FF;
 pub const ROM_MAX_MASK: u32 = 0xFFFFFF;
 
-pub static CUSTOM_BIOS: &[u8] = include_bytes!("../../../bios/bios.bin");
+pub static CUSTOM_BIOS: &[u8] = include_bytes!("../../bios/bios.bin");
 
 pub struct GbaMemory {
     pub(crate) bios: Box<[u8; BIOS_SIZE as usize]>,

@@ -8,8 +8,6 @@ pub fn render(
     vram: &[u8; VRAM_SIZE as usize],
 ) {
     for bg in 0..4 {
-        // FIXME(lcd/windows): make sure that the current line of this background is visible
-        //                     in one of the windows being rendered if there are any.
         if !ioregs.dispcnt.display_bg(bg) {
             continue;
         }

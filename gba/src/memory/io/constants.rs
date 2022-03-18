@@ -151,6 +151,7 @@ pub const JOYSTAT: u32 = 0x04000158;
 // Interrupt, Waitstate, and Power-Down Control
 pub const IE: u32 = 0x04000200;
 pub const IF: u32 = 0x04000202;
+pub const IF_HI: u32 = 0x04000203;
 pub const WAITCNT: u32 = 0x04000204;
 pub const IME: u32 = 0x04000208;
 pub const IME_HI: u32 = 0x0400020A;

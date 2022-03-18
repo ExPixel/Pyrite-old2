@@ -27,7 +27,7 @@ pub fn started(idx: usize, ioregs: &mut IoRegisters, scheduler: &Scheduler) {
     scheduler.schedule(overflow_fn, overflow_cycles, event_tag);
 }
 
-pub fn stopped(timer: usize, timers: &mut [Timer; 4], scheduler: &Scheduler) {
+pub fn stopped(timer: usize, _timers: &mut [Timer; 4], scheduler: &Scheduler) {
     scheduler.unschedule(EventTag::timer(timer));
 }
 

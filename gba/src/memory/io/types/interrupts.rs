@@ -39,7 +39,7 @@ impl InterruptReqAck {
     }
 
     pub fn clear(&mut self) {
-        self.value.replace_bits(0, 13, 0);
+        self.value = self.value.replace_bits(0, 13, 0);
     }
 
     pub fn has_requests(&self) -> bool {
@@ -47,7 +47,7 @@ impl InterruptReqAck {
     }
 
     /// Interrupts can be acknowledged by writing a one to one of the IRQ bits.
-    pub fn set_acknowledge(&mut self, value: u16) {
+    pub fn write(&mut self, value: u16) {
         self.value &= !value;
     }
 }

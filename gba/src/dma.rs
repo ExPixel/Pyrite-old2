@@ -144,6 +144,7 @@ fn begin_dma<const DMA: usize>(gba: &mut Gba) {
     }
 
     gba.step_fn = dma_step_fn(DMA, gba.mem.ioregs.dma[DMA].control.transfer_type());
+    gba.in_dma = true;
 }
 
 pub fn step<const DMA: usize, const TRANSFER_TYPE: bool>(gba: &mut Gba) -> arm::Cycles {
@@ -212,5 +213,6 @@ fn on_dma_transfer_end<const DMA: usize>(gba: &mut Gba) {
         return;
     }
 
+    gba.in_dma = false;
     gba.restore_step();
 }

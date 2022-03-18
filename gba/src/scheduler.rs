@@ -21,6 +21,9 @@ pub enum EventTag {
     DMA3,
 
     IRQ,
+
+    Stop,
+    Halt,
 }
 
 impl EventTag {
@@ -67,6 +70,10 @@ impl Scheduler {
 
     pub fn advance(&self, cycles: impl Into<Cycles>) -> Option<(EventFn, Cycles)> {
         self.inner.borrow_mut().advance(cycles.into())
+    }
+
+    pub fn next_event_cycles(&self) -> Option<arm::Cycles> {
+        self.inner.borrow().next_event_cycles()
     }
 
     #[cfg(test)]
@@ -118,6 +125,10 @@ impl Inner {
 
         let event = self.events.pop_front().unwrap();
         Some((event.callback, cycles - event.cycles_remaining))
+    }
+
+    fn next_event_cycles(&self) -> Option<arm::Cycles> {
+        self.events.front().map(|event| event.cycles_remaining)
     }
 }
 

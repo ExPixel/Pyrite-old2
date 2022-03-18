@@ -81,6 +81,7 @@ impl GbaMemory {
             IF => self.ioregs.if_reg.into(),
             WAITCNT => self.ioregs.waitcnt.into(),
             IME => self.ioregs.ime.into(),
+            IME_HI => 0,
 
             _ => {
                 log::warn!(
@@ -172,7 +173,7 @@ impl GbaMemory {
 
             // Interrupt, Waitstate, and Power-Down Control
             IE => self.ioregs.ie_reg.set_preserve_bits(value),
-            IF => self.ioregs.if_reg.set_acknowledge(value),
+            IF => self.ioregs.if_reg.write(value),
             WAITCNT => {
                 self.ioregs.waitcnt.set_preserve_bits(value);
                 self.update_waitcnt();
@@ -182,6 +183,10 @@ impl GbaMemory {
                 // This write doesn't do anything but it happens often enough
                 // (because IME is addressed as a 32bit register) that this implementation
                 // is needed to reduce noise.
+            }
+            POSTFLG => {
+                self.ioregs.postflg.set_preserve_bits(value as u8);
+                self.write_to_haltcnt((value >> 8) as u8);
             }
 
             _ => {
@@ -195,11 +200,31 @@ impl GbaMemory {
     }
 
     pub(super) fn store8_io(&mut self, address: u32, value: u8) {
-        let mut value16 = self.load16_io::<false>(address);
-        let shift = (address & 1) * 8;
-        value16 &= !0xFF << shift;
-        value16 |= (value as u16) << shift;
-        self.store16_io(address, value16)
+        match address {
+            POSTFLG => self.ioregs.postflg.set_preserve_bits(value),
+            HALTCNT => self.write_to_haltcnt(value),
+            IF => self.ioregs.if_reg.write(value as u16),
+            IF_HI => self.ioregs.if_reg.write((value as u16) << 8),
+            _ => {
+                let mut value16 = self.load16_io::<false>(address);
+                let shift = (address & 1) * 8;
+                value16 &= !0xFF << shift;
+                value16 |= (value as u16) << shift;
+                self.store16_io(address, value16)
+            }
+        }
+    }
+
+    fn write_to_haltcnt(&mut self, value: u8) {
+        let haltcnt = LowPowerModeControl::new(value);
+
+        if haltcnt.stop() {
+            self.scheduler
+                .schedule(|gba, _| gba.stop(), 0, EventTag::Stop);
+        } else {
+            self.scheduler
+                .schedule(|gba, _| gba.halt(), 0, EventTag::Halt);
+        }
     }
 
     fn write_to_timer_reload(&mut self, timer: usize, value: u16) {
@@ -333,6 +358,7 @@ pub struct IoRegisters {
     pub(crate) if_reg: InterruptReqAck,
     pub(crate) waitcnt: WaitstateControl,
     pub(crate) ime: InterruptMasterEnable,
+    pub(crate) postflg: PostBoot,
 
     /// This is NOT a register but a temporary location for pending interrupts.
     pub(crate) irq_pending: InterruptReqAck,

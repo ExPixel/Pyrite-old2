@@ -8,7 +8,7 @@ mod video;
 use dma::GbaDMA;
 pub use memory::GbaMemory;
 
-use arm::{Cpu, Memory};
+use arm::{Cpu, Cycles, Memory};
 use scheduler::Scheduler;
 use util::bits::Bits;
 pub use video::{GbaVideo, SCREEN_HEIGHT, SCREEN_PIXEL_COUNT, SCREEN_WIDTH};
@@ -17,9 +17,11 @@ pub struct Gba {
     mem: GbaMemory,
     cpu: Cpu,
     dma: [GbaDMA; 4],
+    in_dma: bool,
     video: GbaVideo,
     scheduler: Scheduler,
     step_fn: fn(&mut Self) -> arm::Cycles,
+    state: State,
 }
 
 impl Gba {
@@ -35,8 +37,10 @@ impl Gba {
                 GbaDMA::default(),
                 GbaDMA::default(),
             ],
+            in_dma: false,
             video: GbaVideo::new(scheduler.clone()),
             scheduler,
+            state: State::Running,
             step_fn: Self::step_cpu,
         }
     }
@@ -106,10 +110,26 @@ impl Gba {
         self.cpu.step(&mut self.mem)
     }
 
+    fn step_idle(&mut self) -> arm::Cycles {
+        let remain_idle = self.mem.ioregs.ie_reg.value & self.mem.ioregs.if_reg.value == 0;
+
+        if !remain_idle {
+            self.state = State::Running;
+            self.restore_step();
+            Cycles::ZERO
+        } else {
+            self.scheduler
+                .next_event_cycles()
+                .unwrap_or(Cycles::new(32))
+        }
+    }
+
     fn restore_step(&mut self) {
-        // FIXME evetually this should handle going into an IDLE state if the
-        //       CPU is waiting for an interrupt or something.
-        self.step_fn = Self::step_cpu;
+        self.step_fn = match self.state {
+            State::Running => Self::step_cpu,
+            State::Halted => Self::step_idle,
+            State::Stopped => Self::step_idle,
+        };
     }
 
     pub fn step(&mut self) {
@@ -119,6 +139,22 @@ impl Gba {
         while let Some((event, next_cycles)) = self.scheduler.advance(cycles) {
             cycles = next_cycles;
             (event)(self, cycles);
+        }
+    }
+
+    pub(crate) fn stop(&mut self) {
+        self.state = State::Stopped;
+
+        if !self.in_dma {
+            self.restore_step();
+        }
+    }
+
+    pub(crate) fn halt(&mut self) {
+        self.state = State::Halted;
+
+        if !self.in_dma {
+            self.restore_step();
         }
     }
 
@@ -152,6 +188,13 @@ impl Default for Gba {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum State {
+    Running,
+    Halted,
+    Stopped,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]

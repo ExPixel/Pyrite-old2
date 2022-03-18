@@ -16,7 +16,7 @@ macro_rules! likely {
 macro_rules! primitive_enum {
     (
         $(#[$meta:meta])* $visibility:vis
-        enum $Name:ident: $PrimitiveType:ident {
+        enum $Name:ident: $PrimitiveType:ident $(($($ExtraPrimitiveType:ident),+))? {
             $($Variant:ident $(= $value:expr)?),*
             $(,)?
         }
@@ -42,6 +42,22 @@ macro_rules! primitive_enum {
                 v as $PrimitiveType
             }
         }
+
+        $(
+            $(
+                impl From<$ExtraPrimitiveType> for $Name {
+                    fn from(primitive: $ExtraPrimitiveType) -> $Name {
+                        <$Name>::from(primitive as $PrimitiveType)
+                    }
+                }
+
+                impl From<$Name> for $ExtraPrimitiveType {
+                    fn from(v: $Name) -> $ExtraPrimitiveType {
+                        <$PrimitiveType>::from(v) as $ExtraPrimitiveType
+                    }
+                }
+            )+
+        )?
     };
 }
 

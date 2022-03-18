@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = ["devkit-arm-tests"]
 devkit-arm-tests = []
+track_register_writes = []
 
 [dependencies]
 util = { path = "../util" }

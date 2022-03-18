@@ -21,7 +21,6 @@ fn process_irq(gba: &mut Gba, _late: arm::Cycles) {
     let pending = gba.mem.ioregs.irq_pending;
     gba.mem.ioregs.irq_pending.clear();
 
-    // If IRQs are disabled by the CPU itself, we just clear the pending IRQs and get out of here.
     if gba.cpu.registers.getf_i() {
         return;
     }

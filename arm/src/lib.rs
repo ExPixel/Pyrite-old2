@@ -84,6 +84,7 @@ impl Cpu {
     /// At the start of the step function, the program counter will be one instruction ahead of the address
     /// of the instruction that wil be executed. Before execution occurs it will be set to be two instructions
     /// ahead.
+    #[inline]
     pub fn step(&mut self, memory: &mut dyn Memory) -> Cycles {
         if self.registers.getf_t() {
             self.step_thumb(memory)

@@ -28,6 +28,17 @@ impl LineBuffer {
         self.pixels[layer][x] = pixel | 0x8000;
     }
 
+    /// Applies a horizontal mosaic to a BG layer.
+    pub(crate) fn mosaic(&mut self, layer: usize, mosaic: u32) {
+        if mosaic == 0 {
+            return;
+        }
+
+        self.pixels[layer]
+            .chunks_mut(mosaic as usize)
+            .for_each(|chunk| chunk.fill(chunk[0]));
+    }
+
     pub(crate) fn put_obj_4bpp(&mut self, attrs: PixelAttrs, x: usize, palette: u8, entry: u8) {
         if entry == 0 {
             return;

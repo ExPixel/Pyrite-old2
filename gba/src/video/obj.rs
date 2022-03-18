@@ -159,9 +159,13 @@ pub fn render(
             attrs.set_semi_transparent();
         }
 
-        // TODO: Implement mosaic
-        let mosaic_x = 0;
-        let mosaic_y = 0;
+        let mut mosaic_x = 0usize;
+        let mut mosaic_y = 0usize;
+
+        if attr0.mosaic() {
+            mosaic_x = ioregs.mosaic.obj_h() as usize + 1;
+            mosaic_y = ioregs.mosaic.obj_v() as usize + 1;
+        }
 
         if attr0.palette256() {
             const BYTES_PER_LINE: usize = 8;

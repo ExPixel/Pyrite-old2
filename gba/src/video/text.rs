@@ -1,7 +1,4 @@
-use crate::memory::{
-    io::{BgControl, BgOffset},
-    VRAM_SIZE,
-};
+use crate::memory::{io::IoRegisters, VRAM_SIZE};
 use util::mem::{read_u32_unchecked, read_u64, read_u64_unchecked};
 
 use super::line::LineBuffer;
@@ -12,18 +9,24 @@ pub fn render_4bpp(
     buf: &mut LineBuffer,
     line: u16,
     bgidx: usize,
-    bgcnt: BgControl,
-    bgofs: BgOffset,
+    ioregs: &IoRegisters,
     vram: &Vram,
 ) {
     pub const BYTES_PER_TILE: usize = 32;
     pub const BYTES_PER_LINE: usize = 4;
 
+    let bgcnt = ioregs.bgcnt[bgidx];
+    let bgofs = ioregs.bgofs[bgidx];
+
     buf.layer_attrs_mut(bgidx).set_4bpp();
 
-    // FIXME implement mosaic.
-    let mosaic_x = 0;
-    let mosaic_y = 0;
+    let mut mosaic_x = 0;
+    let mut mosaic_y = 0;
+
+    if bgcnt.mosaic() {
+        mosaic_x = ioregs.mosaic.bg_h() + 1;
+        mosaic_y = ioregs.mosaic.bg_v() + 1;
+    }
 
     let screen_size = bgcnt.screen_size();
     let screen_w = screen_size.width(false);
@@ -93,24 +96,31 @@ pub fn render_4bpp(
             dx += 1;
         }
     }
+    buf.mosaic(bgidx, mosaic_x);
 }
 
 pub fn render_8bpp(
     buf: &mut LineBuffer,
     line: u16,
     bgidx: usize,
-    bgcnt: BgControl,
-    bgofs: BgOffset,
+    ioregs: &IoRegisters,
     vram: &Vram,
 ) {
     pub const BYTES_PER_TILE: usize = 64;
     pub const BYTES_PER_LINE: usize = 8;
 
+    let bgcnt = ioregs.bgcnt[bgidx];
+    let bgofs = ioregs.bgofs[bgidx];
+
     buf.layer_attrs_mut(bgidx).set_4bpp();
 
-    // FIXME implement mosaic.
-    let mosaic_x = 0;
-    let mosaic_y = 0;
+    let mut mosaic_x = 0;
+    let mut mosaic_y = 0;
+
+    if bgcnt.mosaic() {
+        mosaic_x = ioregs.mosaic.bg_h() + 1;
+        mosaic_y = ioregs.mosaic.bg_v() + 1;
+    }
 
     let screen_size = bgcnt.screen_size();
     let screen_w = screen_size.width(false);
@@ -180,7 +190,7 @@ fn bg_wrapped_x_offset(offset: u32, width: u32, mosaic: u32) -> u32 {
 fn bg_wrapped_y_offset(offset: u32, height: u32, line: u32, mosaic: u32) -> u32 {
     let wrapped = (offset + line) & (height - 1);
     if mosaic > 0 {
-        wrapped - (wrapped & mosaic)
+        wrapped - (wrapped % mosaic)
     } else {
         wrapped
     }

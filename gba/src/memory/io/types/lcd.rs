@@ -318,6 +318,26 @@ impl WindowInOut {
     }
 }
 
+bitfields! {
+    /// 400004Ch - MOSAIC - Mosaic Size (W)
+    /// The Mosaic function can be separately enabled/disabled for BG0-BG3 by BG0CNT-BG3CNT Registers, as well as for each OBJ0-127 by OBJ attributes in OAM memory. Also, setting all of the bits below to zero effectively disables the mosaic function.
+    /// Bit   Expl.
+    /// 0-3   BG Mosaic H-Size  (minus 1)
+    /// 4-7   BG Mosaic V-Size  (minus 1)
+    /// 8-11  OBJ Mosaic H-Size (minus 1)
+    /// 12-15 OBJ Mosaic V-Size (minus 1)
+    /// 16-31 Not used
+    pub struct MosaicSize: u32 {
+        [0,3]   bg_h, set_bg_h: u32,
+        [4,7]   bg_v, set_bg_v: u32,
+        [8,11]  obj_h, set_obj_h: u32,
+        [12,15] obj_v, set_obj_v: u32,
+
+        [0,15]  lo, set_lo: u16,
+        [16,31] hi, set_hi: u16,
+    }
+}
+
 util::primitive_enum! {
     pub enum Effect: u16 {
         None = 0,

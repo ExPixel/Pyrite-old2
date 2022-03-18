@@ -36,6 +36,8 @@ impl GbaMemory {
             WIN1V => self.ioregs.winhv.win1_v(),
             WININ => self.ioregs.wininout.winin(),
             WINOUT => self.ioregs.wininout.winout(),
+            MOSAIC => self.ioregs.mosaic.lo(),
+            MOSAIC_HI => self.ioregs.mosaic.hi(),
 
             // DMA
             DMA0SAD => self.ioregs.dma[0].source.lo(),
@@ -131,6 +133,8 @@ impl GbaMemory {
             WIN1V => self.ioregs.winhv.set_win1_v(value),
             WININ => self.ioregs.wininout.set_winin(value),
             WINOUT => self.ioregs.wininout.set_winout(value),
+            MOSAIC => self.ioregs.mosaic.set_lo(value),
+            MOSAIC_HI => self.ioregs.mosaic.set_hi(value),
 
             // DMA
             DMA0SAD => self.ioregs.dma[0].source.set_lo(value),
@@ -331,6 +335,7 @@ pub struct IoRegisters {
     pub(crate) bgofs: [BgOffset; 4],
     pub(crate) winhv: WindowDimensions,
     pub(crate) wininout: WindowInOut,
+    pub(crate) mosaic: MosaicSize,
     pub(crate) bldcnt: ColorSpecialEffects,
     pub(crate) bldalpha: AlphaBlendingCoeff,
     pub(crate) bldy: BrightnessCoeff,

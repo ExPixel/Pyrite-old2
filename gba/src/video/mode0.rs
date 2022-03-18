@@ -13,12 +13,10 @@ pub fn render(
         }
 
         let bgcnt = ioregs.bgcnt[bg as usize];
-        let bgofs = ioregs.bgofs[bg as usize];
-
         if bgcnt.palette_256() {
-            text::render_8bpp(buf, line, bg as usize, bgcnt, bgofs, vram);
+            text::render_8bpp(buf, line, bg as usize, ioregs, vram);
         } else {
-            text::render_4bpp(buf, line, bg as usize, bgcnt, bgofs, vram);
+            text::render_4bpp(buf, line, bg as usize, ioregs, vram);
         }
     }
 }

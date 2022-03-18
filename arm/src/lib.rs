@@ -252,7 +252,8 @@ impl Cpu {
         let cpsr = self.registers.read_cpsr();
         self.registers.write_mode(exception_info.mode_on_entry); // Set the entry mode.
         self.registers.write_spsr(cpsr); // Set the CPSR of the old mode to the SPSR of the new mode.
-        self.registers.write(14, return_addr); // Save the return address.
+        self.registers
+            .write(14, return_addr.wrapping_add(exception_info.pc_adjust)); // Save the return address.
         self.registers.clearf_t(); // Go into ARM mode.
 
         self.registers.putf_i(true); // IRQ disable (done by all modes)

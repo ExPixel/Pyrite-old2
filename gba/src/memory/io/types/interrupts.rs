@@ -9,7 +9,7 @@ bitfields! {
         [0]     enabled, set_enabled: bool,
 
         [0,15]  lo, set_lo: u16,
-        [15,31] hi, set_hi: u16,
+        [16,31] hi, set_hi: u16,
     }
 }
 

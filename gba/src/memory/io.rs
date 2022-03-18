@@ -39,6 +39,10 @@ impl GbaMemory {
             MOSAIC => self.ioregs.mosaic.lo(),
             MOSAIC_HI => self.ioregs.mosaic.hi(),
 
+            // Sound
+            SOUNDBIAS => self.ioregs.soundbias.lo(),
+            SOUNDBIAS_H => self.ioregs.soundbias.hi(),
+
             // DMA
             DMA0SAD => self.ioregs.dma[0].source.lo(),
             DMA0SAD_H => self.ioregs.dma[0].source.hi(),
@@ -135,6 +139,10 @@ impl GbaMemory {
             WINOUT => self.ioregs.wininout.set_winout(value),
             MOSAIC => self.ioregs.mosaic.set_lo(value),
             MOSAIC_HI => self.ioregs.mosaic.set_hi(value),
+
+            // Sound
+            SOUNDBIAS => self.ioregs.soundbias.set_lo(value),
+            SOUNDBIAS_H => self.ioregs.soundbias.set_hi(value),
 
             // DMA
             DMA0SAD => self.ioregs.dma[0].source.set_lo(value),
@@ -339,6 +347,9 @@ pub struct IoRegisters {
     pub(crate) bldcnt: ColorSpecialEffects,
     pub(crate) bldalpha: AlphaBlendingCoeff,
     pub(crate) bldy: BrightnessCoeff,
+
+    // Sound
+    pub(crate) soundbias: SoundBias,
 
     // DMA
     pub(crate) dma: [DMARegisters; 4],

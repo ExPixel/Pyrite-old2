@@ -80,8 +80,8 @@ impl GbaMemory {
             IE => self.ioregs.ie_reg.into(),
             IF => self.ioregs.if_reg.into(),
             WAITCNT => self.ioregs.waitcnt.into(),
-            IME => self.ioregs.ime.into(),
-            IME_HI => 0,
+            IME => self.ioregs.ime.lo(),
+            IME_HI => self.ioregs.ime.hi(),
 
             _ => {
                 log::warn!(
@@ -178,12 +178,8 @@ impl GbaMemory {
                 self.ioregs.waitcnt.set_preserve_bits(value);
                 self.update_waitcnt();
             }
-            IME => self.ioregs.ime.set_preserve_bits(value),
-            IME_HI => {
-                // This write doesn't do anything but it happens often enough
-                // (because IME is addressed as a 32bit register) that this implementation
-                // is needed to reduce noise.
-            }
+            IME => self.ioregs.ime.set_lo(value),
+            IME_HI => self.ioregs.ime.set_hi(value),
             POSTFLG => {
                 self.ioregs.postflg.set_preserve_bits(value as u8);
                 self.write_to_haltcnt((value >> 8) as u8);

@@ -5,8 +5,11 @@ bitfields! {
     ///   Bit   Expl.
     ///   0     Disable all interrupts         (0=Disable All, 1=See [`InterruptEnable`])
     ///   1-31  Not used
-    pub struct InterruptMasterEnable: u16 {
-        [0] enabled, set_enabled: bool,
+    pub struct InterruptMasterEnable: u32 {
+        [0]     enabled, set_enabled: bool,
+
+        [0,15]  lo, set_lo: u16,
+        [15,31] hi, set_hi: u16,
     }
 }
 

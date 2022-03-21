@@ -63,6 +63,7 @@ impl GbaVideo {
         mem.ioregs.vcount = match mem.ioregs.vcount {
             159 => {
                 mem.ioregs.dispstat.set_vblank(true);
+                mem.copy_reference_points();
                 160
             }
 
@@ -98,6 +99,10 @@ impl GbaVideo {
             let output_buf_end = output_buf_start + 240;
             let output_buf = &mut self.screen[output_buf_start..output_buf_end];
             Self::render_line(line, output_buf, mem);
+        }
+
+        if line < 160 {
+            mem.increment_reference_points();
         }
 
         self.scheduler

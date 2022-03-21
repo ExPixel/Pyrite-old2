@@ -1,5 +1,8 @@
 use crate::memory::{io::IoRegisters, VRAM_SIZE};
-use util::mem::{read_u32_unchecked, read_u64, read_u64_unchecked};
+use util::{
+    fixedpoint::FixedPoint32,
+    mem::{read_u32_unchecked, read_u64, read_u64_unchecked},
+};
 
 use super::line::LineBuffer;
 
@@ -174,26 +177,85 @@ pub fn render_8bpp(
     }
 }
 
+pub fn render_affine(buf: &mut LineBuffer, bgidx: usize, ioregs: &IoRegisters, vram: &Vram) {
+    let bgcnt = ioregs.bgcnt[bgidx];
+
+    buf.layer_attrs_mut(bgidx).set_8bpp();
+
+    let mut mosaic_x = 0;
+    let mut mosaic_y = 0;
+    if bgcnt.mosaic() {
+        mosaic_x = ioregs.mosaic.bg_h() + 1;
+        mosaic_y = ioregs.mosaic.bg_v() + 1;
+    }
+
+    let screen_size = bgcnt.screen_size();
+    let screen_w = screen_size.width(true);
+    let screen_h = screen_size.height(true);
+    let char_base = bgcnt.character_base();
+    let screen_base = bgcnt.screen_base();
+
+    let (x_mask, y_mask) = if bgcnt.wraparound() {
+        ((screen_w - 1) as i32, (screen_h - 1) as i32)
+    } else {
+        (0xFFFFFFFFu32 as i32, 0xFFFFFFFFu32 as i32)
+    };
+
+    let (mut x, mut y, dx, dy) = match bgidx {
+        2 => (
+            ioregs.bg2x_internal,
+            ioregs.bg2y_internal,
+            FixedPoint32::from(ioregs.bg2pa),
+            FixedPoint32::from(ioregs.bg2pc),
+        ),
+        3 => (
+            ioregs.bg3x_internal,
+            ioregs.bg3y_internal,
+            FixedPoint32::from(ioregs.bg3pa),
+            FixedPoint32::from(ioregs.bg3pc),
+        ),
+        _ => unreachable!("invalid BG for mode 2"),
+    };
+
+    for idx in 0..240 {
+        x += dx;
+        y += dy;
+
+        let ix = apply_mosaic((x.integer() & x_mask) as u32, mosaic_x);
+        let iy = apply_mosaic((y.integer() & y_mask) as u32, mosaic_y);
+
+        if (ix < screen_w) & (iy < screen_h) {
+            let tx = ix / 8;
+            let ty = iy / 8;
+            let tile_number = vram[(screen_base + (ty * (screen_w / 8)) + tx) as usize];
+            let tile_pixel_data_offset =
+                char_base + (64 * tile_number as u32) + (8 * (iy % 8)) + (ix % 8);
+            let entry = vram[tile_pixel_data_offset as usize];
+            buf.put_8bpp(bgidx, idx, entry);
+        }
+    }
+}
+
+fn apply_mosaic(n: u32, mosaic: u32) -> u32 {
+    if mosaic == 0 {
+        n
+    } else {
+        n - (n % mosaic)
+    }
+}
+
 /// Returns the real x offset of a text mode background taking into account wrapping and
 /// the mosaic register x value.
 fn bg_wrapped_x_offset(offset: u32, width: u32, mosaic: u32) -> u32 {
     let wrapped = offset & (width - 1);
-    if mosaic > 0 {
-        wrapped - (wrapped % mosaic)
-    } else {
-        wrapped
-    }
+    apply_mosaic(wrapped, mosaic)
 }
 
 /// Returns the real y offset of a text mode background taking into account wrapping and
 /// the mosaic register x value.
 fn bg_wrapped_y_offset(offset: u32, height: u32, line: u32, mosaic: u32) -> u32 {
     let wrapped = (offset + line) & (height - 1);
-    if mosaic > 0 {
-        wrapped - (wrapped % mosaic)
-    } else {
-        wrapped
-    }
+    apply_mosaic(wrapped, mosaic)
 }
 
 struct TileLoader<'v> {

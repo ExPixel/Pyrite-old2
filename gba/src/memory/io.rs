@@ -6,7 +6,10 @@ use crate::scheduler::{EventFn, EventTag};
 use super::GbaMemory;
 pub use constants::*;
 pub use types::*;
-use util::bits::Bits as _;
+use util::{
+    bits::Bits as _,
+    fixedpoint::{FixedPoint16, FixedPoint32},
+};
 
 impl GbaMemory {
     pub(super) fn load32_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u32 {
@@ -29,7 +32,8 @@ impl GbaMemory {
             BG3CNT => self.ioregs.bgcnt[3].into(),
             BLDCNT => self.ioregs.bldcnt.into(),
             BLDALPHA => self.ioregs.bldalpha.into(),
-            BLDY => self.ioregs.bldy.into(),
+            BLDY => self.ioregs.bldy.lo(),
+            BLDY_H => self.ioregs.bldy.hi(),
             WIN0H => self.ioregs.winhv.win0_h(),
             WIN1H => self.ioregs.winhv.win1_h(),
             WIN0V => self.ioregs.winhv.win0_v(),
@@ -159,9 +163,26 @@ impl GbaMemory {
             BG2VOFS => self.ioregs.bgofs[2].set_y(value),
             BG3HOFS => self.ioregs.bgofs[3].set_x(value),
             BG3VOFS => self.ioregs.bgofs[3].set_y(value),
+            BG2PA => self.ioregs.bg2pa = FixedPoint16::raw(value as i16),
+            BG2PB => self.ioregs.bg2pb = FixedPoint16::raw(value as i16),
+            BG2PC => self.ioregs.bg2pc = FixedPoint16::raw(value as i16),
+            BG2PD => self.ioregs.bg2pd = FixedPoint16::raw(value as i16),
+            BG2X => self.ioregs.bg2x.set_lo(value),
+            BG2X_H => self.ioregs.bg2x.set_hi(value),
+            BG2Y => self.ioregs.bg2y.set_lo(value),
+            BG2Y_H => self.ioregs.bg2y.set_hi(value),
+            BG3PA => self.ioregs.bg3pa = FixedPoint16::raw(value as i16),
+            BG3PB => self.ioregs.bg3pb = FixedPoint16::raw(value as i16),
+            BG3PC => self.ioregs.bg3pc = FixedPoint16::raw(value as i16),
+            BG3PD => self.ioregs.bg3pd = FixedPoint16::raw(value as i16),
+            BG3X => self.ioregs.bg3x.set_lo(value),
+            BG3X_H => self.ioregs.bg3x.set_hi(value),
+            BG3Y => self.ioregs.bg3y.set_lo(value),
+            BG3Y_H => self.ioregs.bg3y.set_hi(value),
             BLDCNT => self.ioregs.bldcnt.set_preserve_bits(value),
             BLDALPHA => self.ioregs.bldalpha.set_preserve_bits(value),
-            BLDY => self.ioregs.bldy.set_preserve_bits(value),
+            BLDY => self.ioregs.bldy.set_lo(value),
+            BLDY_H => self.ioregs.bldy.set_hi(value),
             WIN0H => self.ioregs.winhv.set_win0_h(value),
             WIN1H => self.ioregs.winhv.set_win1_h(value),
             WIN0V => self.ioregs.winhv.set_win0_v(value),
@@ -349,6 +370,22 @@ impl GbaMemory {
         }
     }
 
+    /// Copies the reference point registers (BG2X, BG2Y, BG3X, BG3Y) into
+    /// the internal reference point registers that are actually used while rendering.
+    pub fn copy_reference_points(&mut self) {
+        self.ioregs.bg2x_internal = self.ioregs.bg2x.into();
+        self.ioregs.bg2y_internal = self.ioregs.bg2y.into();
+        self.ioregs.bg3x_internal = self.ioregs.bg3x.into();
+        self.ioregs.bg3y_internal = self.ioregs.bg3y.into();
+    }
+
+    pub fn increment_reference_points(&mut self) {
+        self.ioregs.bg2x_internal += FixedPoint32::from(self.ioregs.bg2pb);
+        self.ioregs.bg2y_internal += FixedPoint32::from(self.ioregs.bg2pd);
+        self.ioregs.bg3x_internal += FixedPoint32::from(self.ioregs.bg3pb);
+        self.ioregs.bg3y_internal += FixedPoint32::from(self.ioregs.bg3pd);
+    }
+
     pub(super) fn update_waitcnt(&mut self) {
         // NOTE: subtract 1 from cycles to get number of wait states.
         //
@@ -403,12 +440,29 @@ pub struct IoRegisters {
     pub(crate) vcount: u16,
     pub(crate) bgcnt: [BgControl; 4],
     pub(crate) bgofs: [BgOffset; 4],
+    pub(crate) bg2pa: FixedPoint16,
+    pub(crate) bg2pb: FixedPoint16,
+    pub(crate) bg2pc: FixedPoint16,
+    pub(crate) bg2pd: FixedPoint16,
+    pub(crate) bg2x: FixedPoint28,
+    pub(crate) bg2y: FixedPoint28,
+    pub(crate) bg3pa: FixedPoint16,
+    pub(crate) bg3pb: FixedPoint16,
+    pub(crate) bg3pc: FixedPoint16,
+    pub(crate) bg3pd: FixedPoint16,
+    pub(crate) bg3x: FixedPoint28,
+    pub(crate) bg3y: FixedPoint28,
     pub(crate) winhv: WindowDimensions,
     pub(crate) wininout: WindowInOut,
     pub(crate) mosaic: MosaicSize,
     pub(crate) bldcnt: ColorSpecialEffects,
     pub(crate) bldalpha: AlphaBlendingCoeff,
     pub(crate) bldy: BrightnessCoeff,
+
+    pub(crate) bg2x_internal: FixedPoint32,
+    pub(crate) bg2y_internal: FixedPoint32,
+    pub(crate) bg3x_internal: FixedPoint32,
+    pub(crate) bg3y_internal: FixedPoint32,
 
     // Sound
     pub(crate) sound1cnt_l: SweepControl,

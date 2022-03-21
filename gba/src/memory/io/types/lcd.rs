@@ -1,5 +1,6 @@
 use util::bitfields;
 use util::bits::Bits as _;
+use util::fixedpoint::FixedPoint32;
 
 bitfields! {
     /// **4000000h - DISPCNT - LCD Control (Read/Write)**
@@ -220,16 +221,19 @@ bitfields! {
     /// Used for Color Special Effects Modes 2 and 3.
     /// Bit   Expl.
     /// 0-4   EVY Coefficient (Brightness) (0..16 = 0/16..16/16, 17..31=16/16)
-    pub struct BrightnessCoeff: u16 {}
+    pub struct BrightnessCoeff: u32 {
+        [0,15]  lo, set_lo: u16,
+        [16,31] hi, set_hi: u16,
+    }
 }
 
 impl BrightnessCoeff {
     pub fn evy_coeff(&self) -> u16 {
-        self.value.bits(0, 4).min(16)
+        self.value.bits(0, 4).min(16) as u16
     }
 
     pub fn set_evy_coeff(&mut self, evy_coeff: u16) {
-        self.value = self.value.replace_bits(0, 4, evy_coeff.min(16));
+        self.value = self.value.replace_bits(0, 4, evy_coeff.min(16) as u32);
     }
 }
 
@@ -335,6 +339,25 @@ bitfields! {
 
         [0,15]  lo, set_lo: u16,
         [16,31] hi, set_hi: u16,
+    }
+}
+
+bitfields! {
+    pub struct FixedPoint28: u32 {
+        [0,15]  lo, set_lo: u16,
+        [16,31] hi, set_hi: u16,
+    }
+}
+
+impl From<FixedPoint32> for FixedPoint28 {
+    fn from(fp32: FixedPoint32) -> FixedPoint28 {
+        FixedPoint28::new(fp32.to_inner() as u32 & 0x0FFFFFFF)
+    }
+}
+
+impl From<FixedPoint28> for FixedPoint32 {
+    fn from(fp28: FixedPoint28) -> FixedPoint32 {
+        FixedPoint32::raw(((fp28.value << 4) as i32) >> 4)
     }
 }
 

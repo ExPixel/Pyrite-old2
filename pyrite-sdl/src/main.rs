@@ -252,6 +252,7 @@ fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub struct GbaAudio {
     spec: AudioSpec,
 }
@@ -260,18 +261,7 @@ impl AudioCallback for GbaAudio {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [Self::Channel]) {
-        static mut PHASE: f32 = 0.0;
-        static VOLUME: f32 = 0.001;
-
-        let phase_inc = 440.0 / self.spec.freq as f32;
-        out.iter_mut().for_each(|sample| {
-            *sample = if unsafe { PHASE } <= 0.5 {
-                VOLUME
-            } else {
-                -VOLUME
-            };
-            unsafe { PHASE = (PHASE + phase_inc) % 1.0 };
-        });
+        out.fill(0.0)
     }
 }
 

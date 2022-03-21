@@ -206,18 +206,29 @@ impl LineBuffer {
         mask
     }
 
-    pub fn render(&self, output: &mut [u16], ioregs: &IoRegisters, palette: &Palette) {
+    fn backdrop_pixel(ioregs: &IoRegisters, palette: &Palette) -> Pixel {
         let backdrop_color = palette.get_bg256(0) | 0x8000;
         let mut backdrop_attrs = PixelAttrs::default();
+        backdrop_attrs.set_priority(3);
         if ioregs.bldcnt.is_first_target(BACKDROP) {
             backdrop_attrs.set_first_target();
         }
         if ioregs.bldcnt.is_second_target(BACKDROP) {
             backdrop_attrs.set_second_target();
         }
+
+        let mut empty_attrs = PixelAttrs::default();
+        empty_attrs.set_priority(3);
+
         let mut backdrop = Pixel::default();
+        backdrop.push(backdrop_color, empty_attrs);
         backdrop.push(backdrop_color, backdrop_attrs);
-        let mut pixels = [backdrop; 240];
+
+        backdrop
+    }
+
+    pub fn render(&self, output: &mut [u16], ioregs: &IoRegisters, palette: &Palette) {
+        let mut pixels = [Self::backdrop_pixel(ioregs, palette); 240];
 
         for priority in (0..4).rev() {
             for bg in (0usize..4).rev() {
@@ -343,20 +354,17 @@ struct Pixel {
 
 impl Pixel {
     pub fn push(&mut self, color: u16, attrs: PixelAttrs) {
-        self.colors.1 = self.colors.0;
-        self.colors.0 = color;
-
-        self.attrs.1 = self.attrs.0;
-        self.attrs.0 = attrs;
+        self.colors.1 = std::mem::replace(&mut self.colors.0, color);
+        self.attrs.1 = std::mem::replace(&mut self.attrs.0, attrs);
     }
 
     pub fn place_obj(&mut self, color: u16, attrs: PixelAttrs) {
-        if self.attrs.0.priority() <= attrs.priority() {
+        if attrs.priority() <= self.attrs.0.priority() {
             self.push(color, attrs);
             return;
         }
 
-        if self.attrs.1.priority() <= attrs.priority() {
+        if attrs.priority() <= self.attrs.1.priority() {
             self.colors.1 = color;
             self.attrs.1 = attrs;
         }

@@ -62,9 +62,6 @@ pub fn render(
 
         let attrs_index = obj_idx as usize * 8;
         let attr0 = ObjAttr0::new(read_u16(oam, attrs_index));
-        if attr0.disabled() && !attr0.rotscale() {
-            continue;
-        }
         let attr1 = ObjAttr1::new(read_u16(oam, attrs_index + 2));
         let attr2 = ObjAttr2::new(read_u16(oam, attrs_index + 4));
 

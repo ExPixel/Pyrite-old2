@@ -28,7 +28,38 @@ pub fn render(
         1210
     };
 
-    for obj_idx in (0..128).rev() {
+    let mut objects = [0u8; 128];
+    let mut visible_objects = 0;
+    let mut disabled_idx = 128;
+    (0..128).rev().for_each(|obj_idx| {
+        let attrs_index = obj_idx as usize * 8;
+        let attr0 = ObjAttr0::new(read_u16(oam, attrs_index));
+        if attr0.disabled() && !attr0.rotscale() {
+            disabled_idx -= 1;
+            objects[disabled_idx] = 0xFF;
+            return;
+        }
+        objects[visible_objects] = obj_idx as u8;
+        visible_objects += 1;
+    });
+    let objects = &mut objects[..visible_objects];
+    objects.sort_unstable_by(|&ol, &or| {
+        let attrs_index_lhs = ol as usize * 8;
+        let attr2_lhs = ObjAttr2::new(read_u16(oam, attrs_index_lhs + 4));
+        let attrs_index_rhs = or as usize * 8;
+        let attr2_rhs = ObjAttr2::new(read_u16(oam, attrs_index_rhs + 4));
+
+        attr2_rhs
+            .priority()
+            .cmp(&attr2_lhs.priority())
+            .then(or.cmp(&ol))
+    });
+
+    for &mut obj_idx in objects {
+        if cycles == 0 {
+            break;
+        }
+
         let attrs_index = obj_idx as usize * 8;
         let attr0 = ObjAttr0::new(read_u16(oam, attrs_index));
         if attr0.disabled() && !attr0.rotscale() {

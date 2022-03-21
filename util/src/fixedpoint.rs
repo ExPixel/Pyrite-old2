@@ -86,6 +86,18 @@ impl std::ops::Neg for FixedPoint16 {
     }
 }
 
+impl std::fmt::Debug for FixedPoint16 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}fp16", self.integer(), self.fractional())
+    }
+}
+
+impl std::fmt::Display for FixedPoint16 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}fp16", self.integer(), self.fractional())
+    }
+}
+
 #[derive(Copy, Clone)]
 pub struct FixedPoint32 {
     inner: i32,

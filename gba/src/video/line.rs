@@ -444,7 +444,6 @@ impl PixelAttrs {
     const SECOND_TARGET: u8 = 0x2; // bit 1
     const PALETTE_4BPP: u8 = 0x4; // bit 2
     const SEMI_TRANSPARENT: u8 = 0x8; // bit 3
-    const OBJ_WINDOW: u8 = 0x10;
 
     fn effects_mask(mut self, has_effects: bool) -> Self {
         if !has_effects {

@@ -11,6 +11,7 @@ pub const BACKDROP: usize = 5;
 pub struct LineBuffer {
     // 240 pixels for each background (BG0-3 + OBJ)
     pixels: [[u16; 240]; 5],
+    objwin: LineBits,
     layer_attrs: [LayerAttrs; 5],
 }
 
@@ -18,6 +19,7 @@ impl Default for LineBuffer {
     fn default() -> Self {
         LineBuffer {
             pixels: [[0; 240]; 5],
+            objwin: LineBits::zeroes(),
             layer_attrs: [LayerAttrs::default(); 5],
         }
     }
@@ -55,8 +57,7 @@ impl LineBuffer {
     }
 
     pub(crate) fn put_obj_window(&mut self, x: usize) {
-        // NOTE: This relies on attrs being in the bottom 8 bits of the pixels for OBJs.
-        self.pixels[OBJ][x] |= PixelAttrs::OBJ_WINDOW as u16;
+        self.objwin.put(x, true);
     }
 
     pub(crate) fn put_4bpp(&mut self, layer: usize, x: usize, palette: u8, entry: u8) {
@@ -138,8 +139,7 @@ impl LineBuffer {
     }
 
     fn has_obj_window_pixel(&self, x: usize) -> bool {
-        // NOTE: This relies on attrs being in the bottom 8 bits of the pixels for OBJs.
-        (self.pixels[OBJ][x] & (PixelAttrs::OBJ_WINDOW as u16)) != 0
+        self.objwin.get(x)
     }
 
     fn generate_window_mask(&self, layer: usize, ioregs: &IoRegisters) -> WindowMask {
@@ -218,7 +218,6 @@ impl LineBuffer {
         let mut backdrop = Pixel::default();
         backdrop.push(backdrop_color, backdrop_attrs);
         let mut pixels = [backdrop; 240];
-        let obj_mask = self.generate_window_mask(OBJ, ioregs);
 
         for priority in (0..4).rev() {
             for bg in (0usize..4).rev() {
@@ -249,6 +248,7 @@ impl LineBuffer {
             }
         }
 
+        let obj_mask = self.generate_window_mask(OBJ, ioregs);
         if ioregs.dispcnt.display_obj() {
             (0..240).for_each(|x| {
                 if !obj_mask.visible(x) {
@@ -501,47 +501,68 @@ impl PixelAttrs {
     }
 }
 
+#[derive(Default, Copy, Clone)]
+struct LineBits {
+    inner: [u8; 30],
+}
+
+impl LineBits {
+    const fn ones() -> Self {
+        LineBits { inner: [0xFF; 30] }
+    }
+
+    const fn zeroes() -> Self {
+        LineBits { inner: [0x00; 30] }
+    }
+
+    fn put(&mut self, index: usize, value: bool) {
+        if index < 240 {
+            self.inner[index / 8] |= (value as u8) << (index % 8);
+        }
+    }
+
+    fn get(&self, index: usize) -> bool {
+        if index < 240 {
+            (self.inner[index / 8] & (1 << (index % 8))) != 0
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 struct WindowMask {
-    visible: [u8; 30],
-    effects: [u8; 30],
+    visible: LineBits,
+    effects: LineBits,
 }
 
 impl WindowMask {
     fn new_all_enabled() -> Self {
         WindowMask {
-            visible: [0xFF; 30],
-            effects: [0xFF; 30],
+            visible: LineBits::ones(),
+            effects: LineBits::ones(),
         }
     }
 
     fn new_all_disabled() -> Self {
         WindowMask {
-            visible: [0x00; 30],
-            effects: [0x00; 30],
+            visible: LineBits::zeroes(),
+            effects: LineBits::zeroes(),
         }
     }
 
     fn set_visible(&mut self, x: usize, visible: bool, effects: bool) {
         if x < 240 {
-            self.visible[x / 8] |= (visible as u8) << (x % 8);
-            self.effects[x / 8] |= (effects as u8) << (x % 8);
+            self.visible.put(x, visible);
+            self.effects.put(x, effects);
         }
     }
 
     fn visible(&self, x: usize) -> bool {
-        if x < 240 {
-            (self.visible[x / 8] & (1 << (x % 8))) != 0
-        } else {
-            false
-        }
+        self.visible.get(x)
     }
 
     fn effects(&self, x: usize) -> bool {
-        if x < 240 {
-            (self.effects[x / 8] & (1 << (x % 8))) != 0
-        } else {
-            false
-        }
+        self.effects.get(x)
     }
 }

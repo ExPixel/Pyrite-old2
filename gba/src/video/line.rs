@@ -195,6 +195,7 @@ impl LineBuffer {
 
             if winobj_enabled && self.has_obj_window_pixel(x as usize) {
                 mask.set_visible(x as _, in_winobj, winobj_effects);
+                continue;
             }
 
             if in_winout {
@@ -384,9 +385,9 @@ fn brightness_increase(c: u16, evy: u16) -> u16 {
 fn brightness_decrease(c: u16, evy: u16) -> u16 {
     let (r, g, b) = decompose(c);
     //   I = I1st - (I1st)*EVY
-    let r = r + ((r * evy) / 16);
-    let g = g + ((g * evy) / 16);
-    let b = b + ((b * evy) / 16);
+    let r = r - ((r * evy) / 16);
+    let g = g - ((g * evy) / 16);
+    let b = b - ((b * evy) / 16);
     recompose(r, g, b)
 }
 

@@ -163,6 +163,10 @@ fn run() -> anyhow::Result<()> {
                     if let Some(button) = keycode_to_button(keycode) {
                         buttons.set_pressed(button, true)
                     }
+
+                    if keycode == Keycode::P {
+                        gba.after_frame(|_, ctx| ctx.paused = !ctx.paused)
+                    }
                 }
 
                 Event::KeyUp {

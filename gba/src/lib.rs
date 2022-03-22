@@ -100,6 +100,8 @@ impl Gba {
     }
 
     pub fn frame(&mut self) {
+        self.audio.clear();
+
         // wait until we are out of VBLANK
         while self.mem.ioregs.dispstat.vblank() {
             self.step();
@@ -137,7 +139,7 @@ impl Gba {
         };
     }
 
-    pub fn step(&mut self) {
+    fn step(&mut self) {
         let mut cycles = (self.step_fn)(self);
 
         loop {

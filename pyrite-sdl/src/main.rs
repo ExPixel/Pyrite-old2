@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     sync::{
         atomic::{self, AtomicU16, AtomicU32, AtomicU64},
         Arc, Mutex,
@@ -281,7 +282,7 @@ fn run() -> anyhow::Result<()> {
 #[allow(dead_code)]
 pub struct GbaAudio {
     spec: AudioSpec,
-    commands: Vec<Command>,
+    commands: VecDeque<Command>,
     command_buffer_queue: Arc<SegQueue<[Command; Self::COMMAND_CHUNK_SIZE]>>,
     fifo_a: f32,
     fifo_b: f32,
@@ -299,7 +300,7 @@ impl GbaAudio {
 
         GbaAudio {
             spec,
-            commands: Vec::with_capacity(64),
+            commands: VecDeque::with_capacity(64),
             command_buffer_queue: queue,
             fifo_a: 0.0,
             fifo_b: 0.0,
@@ -346,7 +347,7 @@ impl GbaAudio {
                 self.commands.extend(new_commands);
             }
         }
-        self.commands.pop()
+        self.commands.pop_front()
     }
 }
 

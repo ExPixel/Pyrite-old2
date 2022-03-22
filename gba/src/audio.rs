@@ -1,5 +1,3 @@
-use arm::Cycles;
-
 use crate::{
     memory::io::{FifoChannel, IoRegisters},
     Gba,

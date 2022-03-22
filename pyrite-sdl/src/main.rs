@@ -11,7 +11,7 @@ use gba::{Button, ButtonSet};
 use sdl2::{
     audio::{AudioCallback, AudioSpec, AudioSpecDesired},
     event::Event,
-    keyboard::Keycode,
+    keyboard::{Keycode, Mod},
     pixels::{Color, PixelFormatEnum},
 };
 
@@ -159,13 +159,14 @@ fn run() -> anyhow::Result<()> {
                 Event::KeyDown {
                     keycode: Some(keycode),
                     repeat,
+                    keymod,
                     ..
                 } => {
                     if let Some(button) = keycode_to_button(keycode) {
                         buttons.set_pressed(button, true)
                     }
 
-                    if !repeat {
+                    if !repeat && keymod.intersects(Mod::LCTRLMOD | Mod::RCTRLMOD) {
                         match keycode {
                             Keycode::P => gba.after_frame(|_, ctx| ctx.paused = !ctx.paused),
                             Keycode::R => gba.after_frame(move |gba, _| gba.reset(boot_from_bios)),

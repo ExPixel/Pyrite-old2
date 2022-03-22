@@ -34,7 +34,6 @@ impl GbaAudio {
         if now > self.last_update_time {
             let elapsed =
                 (now - self.last_update_time).saturating_sub(u32::from(late) as u64) as u32;
-            log::debug!("writing sample after {elapsed} cycles");
             if let Some(Command::Wait(ref mut cycles)) = self.commands.last_mut() {
                 *cycles += elapsed;
             } else {

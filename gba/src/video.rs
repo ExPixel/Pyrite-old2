@@ -39,16 +39,16 @@ impl GbaVideo {
     }
 
     pub(crate) fn init(&mut self, mem: &mut GbaMemory) {
-        self.enter_hdraw(mem, Cycles::ZERO);
+        self.enter_hdraw(mem);
     }
 
-    fn enter_hdraw(&mut self, mem: &mut GbaMemory, late: Cycles) {
+    fn enter_hdraw(&mut self, mem: &mut GbaMemory) {
         mem.ioregs.dispstat.set_hblank(false);
         self.scheduler
-            .schedule(Self::hblank_callback, HDRAW_CYCLES - late, EventTag::HBlank);
+            .schedule(Self::hblank_callback, HDRAW_CYCLES, EventTag::HBlank);
     }
 
-    fn hblank_callback(gba: &mut Gba, late: arm::Cycles) {
+    fn hblank_callback(gba: &mut Gba) {
         if gba.mem.ioregs.vcount < 160 {
             if gba.mem.ioregs.dispstat.hblank_irq_enable() {
                 interrupts::raise(Interrupt::HBlank, &mut gba.mem.ioregs, &gba.scheduler);
@@ -56,10 +56,10 @@ impl GbaVideo {
             dma_on_timing(gba, crate::memory::io::Timing::HBlank);
         }
         gba.video
-            .enter_hblank(&mut gba.mem, gba.state == State::Stopped, late);
+            .enter_hblank(&mut gba.mem, gba.state == State::Stopped);
     }
 
-    fn exit_hblank(&mut self, mem: &mut GbaMemory, late: Cycles) {
+    fn exit_hblank(&mut self, mem: &mut GbaMemory) {
         mem.ioregs.vcount = match mem.ioregs.vcount {
             159 => {
                 mem.ioregs.dispstat.set_vblank(true);
@@ -86,10 +86,10 @@ impl GbaVideo {
             mem.ioregs.dispstat.set_vcounter_match(false);
         }
 
-        self.enter_hdraw(mem, late);
+        self.enter_hdraw(mem);
     }
 
-    fn enter_hblank(&mut self, mem: &mut GbaMemory, stopped: bool, late: Cycles) {
+    fn enter_hblank(&mut self, mem: &mut GbaMemory, stopped: bool) {
         mem.ioregs.dispstat.set_hblank(true);
 
         let line = mem.ioregs.vcount;
@@ -106,11 +106,11 @@ impl GbaVideo {
         }
 
         self.scheduler
-            .schedule(Self::hdraw_callback, HBLANK_CYCLES - late, EventTag::HDraw);
+            .schedule(Self::hdraw_callback, HBLANK_CYCLES, EventTag::HDraw);
     }
 
-    fn hdraw_callback(gba: &mut Gba, late: arm::Cycles) {
-        gba.video.exit_hblank(&mut gba.mem, late);
+    fn hdraw_callback(gba: &mut Gba) {
+        gba.video.exit_hblank(&mut gba.mem);
         if gba.mem.ioregs.vcount == 160 {
             if gba.mem.ioregs.dispstat.vblank_irq_enable() {
                 interrupts::raise(Interrupt::VBlank, &mut gba.mem.ioregs, &gba.scheduler);

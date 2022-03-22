@@ -17,7 +17,7 @@ pub fn raise(interrupt: Interrupt, ioregs: &mut IoRegisters, scheduler: &Schedul
     ioregs.irq_pending.request(interrupt);
 }
 
-fn process_irq(gba: &mut Gba, _late: arm::Cycles) {
+fn process_irq(gba: &mut Gba) {
     let pending = gba.mem.ioregs.irq_pending;
     gba.mem.ioregs.irq_pending.clear();
 

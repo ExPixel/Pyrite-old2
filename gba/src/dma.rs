@@ -94,7 +94,7 @@ impl GbaDMA {
     }
 }
 
-pub fn dma_enabled<const DMA: usize>(gba: &mut Gba, _: arm::Cycles) {
+pub fn dma_enabled<const DMA: usize>(gba: &mut Gba) {
     gba.dma[DMA].repeating = false;
     if gba.mem.ioregs.dma[DMA].control.timing() == Timing::Immediate {
         begin_dma::<DMA>(gba);

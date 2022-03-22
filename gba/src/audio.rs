@@ -20,8 +20,8 @@ impl GbaAudio {
         &self.commands
     }
 
-    fn fifo_play(&mut self, chan: FifoChannel, ioregs: &mut IoRegisters, late: Cycles) {
-        self.wait(ioregs.time, late);
+    fn fifo_play(&mut self, chan: FifoChannel, ioregs: &mut IoRegisters) {
+        self.wait(ioregs.time);
         let sample = if chan == FifoChannel::A {
             ioregs.fifo_a.pop_sample()
         } else {
@@ -30,10 +30,9 @@ impl GbaAudio {
         self.commands.push(Command::PlaySample(chan, sample as i8));
     }
 
-    fn wait(&mut self, now: u64, late: arm::Cycles) {
+    fn wait(&mut self, now: u64) {
         if now > self.last_update_time {
-            let elapsed =
-                (now - self.last_update_time).saturating_sub(u32::from(late) as u64) as u32;
+            let elapsed = (now - self.last_update_time) as u32;
             if let Some(Command::Wait(ref mut cycles)) = self.commands.last_mut() {
                 *cycles += elapsed;
             } else {
@@ -44,19 +43,17 @@ impl GbaAudio {
     }
 }
 
-pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba, late: Cycles) {
+pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba) {
     if gba.mem.ioregs.soundcnt_h.dma_enable(FifoChannel::A)
         && gba.mem.ioregs.soundcnt_h.dma_timer_select(FifoChannel::A) == timer
     {
-        gba.audio
-            .fifo_play(FifoChannel::A, &mut gba.mem.ioregs, late)
+        gba.audio.fifo_play(FifoChannel::A, &mut gba.mem.ioregs);
     }
 
     if gba.mem.ioregs.soundcnt_h.dma_enable(FifoChannel::B)
         && gba.mem.ioregs.soundcnt_h.dma_timer_select(FifoChannel::B) == timer
     {
-        gba.audio
-            .fifo_play(FifoChannel::B, &mut gba.mem.ioregs, late)
+        gba.audio.fifo_play(FifoChannel::B, &mut gba.mem.ioregs);
     }
 }
 

@@ -62,18 +62,12 @@ pub fn flush(timer: &mut Timer, now: u64) {
     timer.origin = now;
 }
 
-pub fn overflow<const TIMER: usize>(gba: &mut Gba, late: arm::Cycles) {
+pub fn overflow<const TIMER: usize>(gba: &mut Gba) {
     let mut overflows = 1u32;
 
     {
         let timer = &mut gba.mem.ioregs.timers[TIMER];
         timer.counter = timer.reload;
-        let mut rem = u32::from(late) >> timer.control.prescaler_shift();
-        while rem >= (0x10000u32 - timer.counter as u32) {
-            overflows += 1;
-            rem -= 0x10000u32 - timer.counter as u32;
-        }
-        timer.counter += rem as u16;
         timer.origin = gba.mem.ioregs.time;
 
         let overflow_cycles =
@@ -83,7 +77,7 @@ pub fn overflow<const TIMER: usize>(gba: &mut Gba, late: arm::Cycles) {
     }
 
     for _ in 0..overflows {
-        after_overflow(TIMER, gba, late);
+        after_overflow(TIMER, gba);
     }
 
     let mut idx = TIMER + 1;
@@ -104,17 +98,17 @@ pub fn overflow<const TIMER: usize>(gba: &mut Gba, late: arm::Cycles) {
         idx += 1;
 
         for _ in 0..overflows {
-            after_overflow(idx, gba, late);
+            after_overflow(idx, gba);
         }
     }
 }
 
-fn after_overflow(idx: usize, gba: &mut Gba, late: arm::Cycles) {
+fn after_overflow(idx: usize, gba: &mut Gba) {
     if gba.mem.ioregs.timers[idx].control.irq_enable() {
         interrupts::raise(Interrupt::timer(idx), &mut gba.mem.ioregs, &gba.scheduler);
     }
 
     if idx == 0 || idx == 1 {
-        audio::check_fifo_timer_overflow(idx, gba, late)
+        audio::check_fifo_timer_overflow(idx, gba);
     }
 }

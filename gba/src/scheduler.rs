@@ -48,7 +48,7 @@ impl EventTag {
     // }
 }
 
-pub type EventFn = fn(gba: &mut Gba, late: Cycles);
+pub type EventFn = fn(gba: &mut Gba);
 
 #[derive(Default, Clone)]
 pub struct Scheduler {
@@ -153,10 +153,10 @@ mod test {
         let mut gba = Gba::default();
         let scheduler = Scheduler::default();
 
-        scheduler.schedule(|_, _| data()[0] = 1, 10u32, EventTag::HBlank);
-        scheduler.schedule(|_, _| data()[3] = 1, 17u32, EventTag::HBlank);
-        scheduler.schedule(|_, _| data()[1] = 1, 13u32, EventTag::HBlank);
-        scheduler.schedule(|_, _| data()[2] = 1, 13u32, EventTag::HBlank);
+        scheduler.schedule(|_| data()[0] = 1, 10u32, EventTag::HBlank);
+        scheduler.schedule(|_| data()[3] = 1, 17u32, EventTag::HBlank);
+        scheduler.schedule(|_| data()[1] = 1, 13u32, EventTag::HBlank);
+        scheduler.schedule(|_| data()[2] = 1, 13u32, EventTag::HBlank);
         scheduler.dump();
 
         assert!(scheduler.advance(6u32).is_none());
@@ -164,23 +164,23 @@ mod test {
 
         let (cb, cycles) = scheduler.advance(6u32).expect("expected event");
         assert_eq!(cycles, Cycles::from(2u32));
-        cb(&mut gba, cycles);
+        cb(&mut gba);
         assert!(scheduler.advance(cycles).is_none());
         assert_eq!(*data(), [1, 0, 0, 0]);
 
         let (cb, cycles) = scheduler.advance(Cycles::ONE).expect("expected event");
         assert_eq!(cycles, Cycles::ZERO);
-        cb(&mut gba, cycles);
+        cb(&mut gba);
         assert_eq!(*data(), [1, 1, 0, 0]);
         let (cb, cycles) = scheduler.advance(cycles).expect("expected event");
         assert_eq!(cycles, Cycles::ZERO);
-        cb(&mut gba, cycles);
+        cb(&mut gba);
         assert!(scheduler.advance(cycles).is_none());
         assert_eq!(*data(), [1, 1, 1, 0]);
 
         let (cb, cycles) = scheduler.advance(8).expect("expected event");
         assert_eq!(cycles, Cycles::from(4u32));
-        cb(&mut gba, cycles);
+        cb(&mut gba);
         assert!(scheduler.advance(cycles).is_none());
         assert_eq!(*data(), [1, 1, 1, 1]);
 

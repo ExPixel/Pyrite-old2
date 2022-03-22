@@ -320,11 +320,9 @@ impl GbaMemory {
         let haltcnt = LowPowerModeControl::new(value);
 
         if haltcnt.stop() {
-            self.scheduler
-                .schedule(|gba, _| gba.stop(), 0, EventTag::Stop);
+            self.scheduler.schedule(|gba| gba.stop(), 0, EventTag::Stop);
         } else {
-            self.scheduler
-                .schedule(|gba, _| gba.halt(), 0, EventTag::Halt);
+            self.scheduler.schedule(|gba| gba.halt(), 0, EventTag::Halt);
         }
     }
 

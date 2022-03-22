@@ -73,10 +73,10 @@ impl GbaMemory {
             WAVE_RAM2_H => self.ioregs.waveram.load16(5),
             WAVE_RAM3_L => self.ioregs.waveram.load16(6),
             WAVE_RAM3_H => self.ioregs.waveram.load16(7),
-            FIFO_A_L => self.ioregs.fifo_a.lo(),
-            FIFO_A_H => self.ioregs.fifo_a.hi(),
-            FIFO_B_L => self.ioregs.fifo_b.lo(),
-            FIFO_B_H => self.ioregs.fifo_b.hi(),
+            FIFO_A_L => 0xDEAD,
+            FIFO_A_H => 0xDEAD,
+            FIFO_B_L => 0xDEAD,
+            FIFO_B_H => 0xDEAD,
 
             // DMA
             DMA0SAD => self.ioregs.dma[0].source.lo(),
@@ -222,10 +222,10 @@ impl GbaMemory {
             WAVE_RAM2_H => self.ioregs.waveram.store16(5, value),
             WAVE_RAM3_L => self.ioregs.waveram.store16(6, value),
             WAVE_RAM3_H => self.ioregs.waveram.store16(7, value),
-            FIFO_A_L => self.ioregs.fifo_a.set_lo(value),
-            FIFO_A_H => self.ioregs.fifo_a.set_hi(value),
-            FIFO_B_L => self.ioregs.fifo_b.set_lo(value),
-            FIFO_B_H => self.ioregs.fifo_b.set_hi(value),
+            FIFO_A_L => self.ioregs.fifo_a.store16(value),
+            FIFO_A_H => self.ioregs.fifo_a.store16(value),
+            FIFO_B_L => self.ioregs.fifo_b.store16(value),
+            FIFO_B_H => self.ioregs.fifo_b.store16(value),
 
             // DMA
             DMA0SAD => self.ioregs.dma[0].source.set_lo(value),
@@ -296,6 +296,16 @@ impl GbaMemory {
             HALTCNT => self.write_to_haltcnt(value),
             IF => self.ioregs.if_reg.write(value as u16),
             IF_HI => self.ioregs.if_reg.write((value as u16) << 8),
+
+            FIFO_A_L => self.ioregs.fifo_a.store8(value),
+            FIFO_A_L_H => self.ioregs.fifo_a.store8(value),
+            FIFO_A_H => self.ioregs.fifo_a.store8(value),
+            FIFO_A_H_H => self.ioregs.fifo_a.store8(value),
+            FIFO_B_L => self.ioregs.fifo_b.store8(value),
+            FIFO_B_L_H => self.ioregs.fifo_b.store8(value),
+            FIFO_B_H => self.ioregs.fifo_b.store8(value),
+            FIFO_B_H_H => self.ioregs.fifo_b.store8(value),
+
             _ => {
                 let mut value16 = self.load16_io::<false>(address);
                 let shift = (address & 1) * 8;

@@ -1,5 +1,6 @@
 use crate::{
-    memory::io::{IoRegisters, Timer},
+    audio, interrupts,
+    memory::io::{Interrupt, IoRegisters, Timer},
     scheduler::{EventTag, Scheduler},
     Gba,
 };
@@ -81,6 +82,10 @@ pub fn overflow<const TIMER: usize>(gba: &mut Gba, late: arm::Cycles) {
             .schedule(overflow::<TIMER>, overflow_cycles, EventTag::timer(TIMER));
     }
 
+    for _ in 0..overflows {
+        after_overflow(TIMER, gba, late);
+    }
+
     let mut idx = TIMER + 1;
     while overflows > 0 && idx < 4 {
         let timer = &mut gba.mem.ioregs.timers[idx];
@@ -91,11 +96,25 @@ pub fn overflow<const TIMER: usize>(gba: &mut Gba, late: arm::Cycles) {
         let mut rem = overflows;
         overflows = 0;
         while rem >= (0x10000u32 - timer.counter as u32) {
-            timer.counter = timer.reload;
             overflows += 1;
             rem -= 0x10000u32 - timer.counter as u32;
+            timer.counter = timer.reload;
         }
         timer.counter += rem as u16;
         idx += 1;
+
+        for _ in 0..overflows {
+            after_overflow(idx, gba, late);
+        }
+    }
+}
+
+fn after_overflow(idx: usize, gba: &mut Gba, late: arm::Cycles) {
+    if gba.mem.ioregs.timers[idx].control.irq_enable() {
+        interrupts::raise(Interrupt::timer(idx), &mut gba.mem.ioregs, &gba.scheduler);
+    }
+
+    if idx == 0 || idx == 1 {
+        audio::check_fifo_timer_overflow(idx, gba, late)
     }
 }

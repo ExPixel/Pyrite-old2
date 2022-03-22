@@ -1,4 +1,4 @@
-use util::{bitfields, bits::Bits, primitive_enum};
+use util::{bitfields, bits::Bits, circular::CircularBuffer, primitive_enum};
 
 bitfields! {
     /// *** 4000060h - SOUND1CNT_L (NR10) - Channel 1 Sweep register (R/W) ***
@@ -162,10 +162,31 @@ bitfields! {
     }
 }
 
-bitfields! {
-    pub struct Fifo: u32 {
-        [0,15]  lo, set_lo: u16,
-        [16,31] hi, set_hi: u16,
+#[derive(Default)]
+pub struct Fifo {
+    buffer: CircularBuffer<u8, 32>,
+}
+
+impl Fifo {
+    pub fn store16(&mut self, value: u16) {
+        self.store8(value as u8);
+        self.store8((value >> 8) as u8);
+    }
+
+    pub fn store8(&mut self, value: u8) {
+        self.buffer.push(value);
+    }
+
+    pub fn pop_sample(&mut self) -> u8 {
+        self.buffer.pop().unwrap_or(0)
+    }
+
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
     }
 }
 
@@ -215,23 +236,28 @@ bitfields! {
 }
 
 impl DMASoundControlMixing {
-    pub fn dma_volume(&self, channel: DMAChannel) -> u16 {
+    pub fn dma_volume(&self, channel: FifoChannel) -> u16 {
         self.value.bit(u32::from(channel) + 2)
     }
 
-    pub fn dma_enable_right(&self, channel: DMAChannel) -> bool {
+    pub fn dma_enable(&self, channel: FifoChannel) -> bool {
+        let start = u32::from(channel) * 4 + 8;
+        self.value.bits(start, start + 1) != 0
+    }
+
+    pub fn dma_enable_right(&self, channel: FifoChannel) -> bool {
         self.value.is_bit_set(u32::from(channel) * 4 + 8)
     }
 
-    pub fn dma_enable_left(&self, channel: DMAChannel) -> bool {
+    pub fn dma_enable_left(&self, channel: FifoChannel) -> bool {
         self.value.is_bit_set(u32::from(channel) * 4 + 9)
     }
 
-    pub fn dma_timer_select(&self, channel: DMAChannel) -> usize {
+    pub fn dma_timer_select(&self, channel: FifoChannel) -> usize {
         self.value.bit(u32::from(channel) * 4 + 10) as usize
     }
 
-    pub fn dma_reset_fifo(&self, channel: DMAChannel) -> bool {
+    pub fn dma_reset_fifo(&self, channel: FifoChannel) -> bool {
         self.value.is_bit_set(u32::from(channel) * 4 + 11)
     }
 }
@@ -288,7 +314,7 @@ primitive_enum! {
 }
 
 primitive_enum! {
-    pub enum DMAChannel: u16 (u32) {
+    pub enum FifoChannel: u16 (u32) {
         A,
         B,
     }

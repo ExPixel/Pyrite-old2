@@ -16,3 +16,7 @@ pretty_env_logger = "0.4"
 [dependencies.sdl2]
 version = "0.34"
 features = ["ttf"]
+
+[dependencies.crossbeam]
+version = "0.8.1"
+features = ["crossbeam-queue"]

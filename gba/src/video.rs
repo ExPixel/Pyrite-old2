@@ -116,6 +116,11 @@ impl GbaVideo {
                 interrupts::raise(Interrupt::VBlank, &mut gba.mem.ioregs, &gba.scheduler);
             }
             dma_on_timing(gba, crate::memory::io::Timing::VBlank)
+        } else if gba.mem.ioregs.vcount == 0 {
+            // FIXME: I don't really like coupling the audio like this but it kind of makes sense I guess
+            //        if I want to sync it up the framerate. Anyways we clear the audio buffer at the start
+            //        of the frame.
+            gba.audio.clear();
         }
     }
 

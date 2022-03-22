@@ -73,3 +73,15 @@ primitive_enum! {
         GamePak,
     }
 }
+
+impl Interrupt {
+    pub fn timer(timer: usize) -> Interrupt {
+        match timer {
+            0 => Interrupt::Timer0Overflow,
+            1 => Interrupt::Timer1Overflow,
+            2 => Interrupt::Timer2Overflow,
+            3 => Interrupt::Timer3Overflow,
+            _ => unreachable!("invalid timer"),
+        }
+    }
+}

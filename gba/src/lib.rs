@@ -1,3 +1,4 @@
+mod audio;
 mod dma;
 mod interrupts;
 pub mod memory;
@@ -9,6 +10,7 @@ use dma::GbaDMA;
 pub use memory::GbaMemory;
 
 use arm::{Cpu, Cycles, Memory};
+pub use audio::{Command, GbaAudio};
 use scheduler::Scheduler;
 use util::bits::Bits;
 pub use video::{GbaVideo, SCREEN_HEIGHT, SCREEN_PIXEL_COUNT, SCREEN_WIDTH};
@@ -19,6 +21,7 @@ pub struct Gba {
     dma: [GbaDMA; 4],
     in_dma: bool,
     video: GbaVideo,
+    audio: GbaAudio,
     scheduler: Scheduler,
     step_fn: fn(&mut Self) -> arm::Cycles,
     state: State,
@@ -39,6 +42,7 @@ impl Gba {
             ],
             in_dma: false,
             video: GbaVideo::new(scheduler.clone()),
+            audio: GbaAudio::default(),
             scheduler,
             state: State::Running,
             step_fn: Self::step_cpu,
@@ -178,6 +182,10 @@ impl Gba {
 
     pub fn video(&self) -> &GbaVideo {
         &self.video
+    }
+
+    pub fn audio(&self) -> &GbaAudio {
+        &self.audio
     }
 
     pub fn cpu(&self) -> &Cpu {

@@ -67,9 +67,13 @@ pub const SOUNDCNT_X_H: u32 = 0x04000086;
 pub const SOUNDBIAS: u32 = 0x04000088;
 pub const SOUNDBIAS_H: u32 = 0x0400008A;
 pub const FIFO_A_L: u32 = 0x040000A0;
+pub const FIFO_A_L_H: u32 = 0x040000A1;
 pub const FIFO_A_H: u32 = 0x040000A2;
+pub const FIFO_A_H_H: u32 = 0x040000A3;
 pub const FIFO_B_L: u32 = 0x040000A4;
+pub const FIFO_B_L_H: u32 = 0x040000A5;
 pub const FIFO_B_H: u32 = 0x040000A6;
+pub const FIFO_B_H_H: u32 = 0x040000A7;
 
 pub const WAVE_RAM0_L: u32 = 0x04000090;
 pub const WAVE_RAM0_H: u32 = 0x04000092;

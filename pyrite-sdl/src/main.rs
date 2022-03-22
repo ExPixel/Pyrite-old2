@@ -158,14 +158,19 @@ fn run() -> anyhow::Result<()> {
 
                 Event::KeyDown {
                     keycode: Some(keycode),
+                    repeat,
                     ..
                 } => {
                     if let Some(button) = keycode_to_button(keycode) {
                         buttons.set_pressed(button, true)
                     }
 
-                    if keycode == Keycode::P {
-                        gba.after_frame(|_, ctx| ctx.paused = !ctx.paused)
+                    if !repeat {
+                        match keycode {
+                            Keycode::P => gba.after_frame(|_, ctx| ctx.paused = !ctx.paused),
+                            Keycode::R => gba.after_frame(move |gba, _| gba.reset(boot_from_bios)),
+                            _ => {}
+                        }
                     }
                 }
 

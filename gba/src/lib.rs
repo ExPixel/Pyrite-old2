@@ -46,6 +46,7 @@ impl Gba {
     }
 
     pub fn reset(&mut self, boot_from_bios: bool) {
+        self.scheduler.clear();
         self.mem.init();
         self.video.init(&mut self.mem);
 

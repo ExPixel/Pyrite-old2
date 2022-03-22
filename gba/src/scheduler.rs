@@ -76,6 +76,10 @@ impl Scheduler {
         self.inner.borrow().next_event_cycles()
     }
 
+    pub(crate) fn clear(&self) {
+        self.inner.borrow_mut().clear();
+    }
+
     #[cfg(test)]
     pub fn dump(&self) {
         for (idx, event) in self.inner.borrow().events.iter().enumerate() {
@@ -129,6 +133,10 @@ impl Inner {
 
     fn next_event_cycles(&self) -> Option<arm::Cycles> {
         self.events.front().map(|event| event.cycles_remaining)
+    }
+
+    fn clear(&mut self) {
+        self.events.clear();
     }
 }
 

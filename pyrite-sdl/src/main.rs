@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::{Context as _, Error};
 use crossbeam::queue::SegQueue;
-use gba::{memory::io::FifoChannel, Button, ButtonSet, Command};
+use gba::{Button, ButtonSet, Command, GbaAudioSampler};
 use sdl2::{
     audio::{AudioCallback, AudioSpec, AudioSpecDesired},
     event::Event,
@@ -284,11 +284,7 @@ pub struct GbaAudio {
     spec: AudioSpec,
     commands: VecDeque<Command>,
     command_buffer_queue: Arc<SegQueue<[Command; Self::COMMAND_CHUNK_SIZE]>>,
-    fifo_a: f32,
-    fifo_b: f32,
-
-    /// The number of samples to output before processing the next command.
-    wait_frames: usize,
+    sampler: GbaAudioSampler,
 }
 
 impl GbaAudio {
@@ -300,45 +296,20 @@ impl GbaAudio {
 
         GbaAudio {
             spec,
+            sampler: GbaAudioSampler::new(spec.freq as u32),
             commands: VecDeque::with_capacity(64),
             command_buffer_queue: queue,
-            fifo_a: 0.0,
-            fifo_b: 0.0,
-            wait_frames: 0,
         }
     }
 
-    fn next_samples(&mut self) -> (f32, f32) {
-        (self.fifo_a, self.fifo_b)
-    }
-
-    fn run_commands(&mut self) {
-        while let Some(command) = self.next_command() {
-            match command {
-                Command::Wait(cycles) if cycles != 0 => {
-                    self.wait_cycles(cycles);
-                    break;
-                }
-                Command::Wait(_) => { /* 0 cycles = NOP */ }
-
-                Command::PlaySample(fifo, sample) => {
-                    const CONVERT: f32 = 1.0 / 128.0;
-                    let sample: f32 = (sample as f32 * CONVERT).clamp(-1.0, 1.0);
-                    if fifo == FifoChannel::A {
-                        self.fifo_a = sample;
-                    } else {
-                        self.fifo_b = sample;
-                    }
-                }
+    fn handle_commands(&mut self) {
+        while self.sampler.needs_commands() {
+            if let Some(cmd) = self.next_command() {
+                self.sampler.command(cmd)
+            } else {
+                break;
             }
         }
-    }
-
-    fn wait_cycles(&mut self, cycles: u32) {
-        const GBA_FREQ_RECIP: f64 = 1.0 / (16.0 * 1024.0 * 1024.0);
-        let freq = self.spec.freq as f64;
-        let cycles = cycles as f64;
-        self.wait_frames = (cycles * freq * GBA_FREQ_RECIP) as usize;
     }
 
     fn next_command(&mut self) -> Option<Command> {
@@ -356,12 +327,8 @@ impl AudioCallback for GbaAudio {
 
     fn callback(&mut self, out: &mut [Self::Channel]) {
         out.chunks_exact_mut(2).for_each(|frame| {
-            if self.wait_frames == 0 {
-                self.run_commands();
-            }
-            self.wait_frames = self.wait_frames.saturating_sub(1);
-
-            let (left, right) = self.next_samples();
+            self.handle_commands();
+            let (left, right) = self.sampler.frame();
             frame[0] = left * 0.02;
             frame[1] = right * 0.02;
         });

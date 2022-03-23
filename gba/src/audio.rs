@@ -1,3 +1,5 @@
+pub mod sampler;
+
 use crate::{
     memory::io::{FifoChannel, IoRegisters},
     Gba,

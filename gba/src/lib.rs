@@ -10,7 +10,7 @@ use dma::GbaDMA;
 pub use memory::GbaMemory;
 
 use arm::{Cpu, Cycles, Memory};
-pub use audio::{Command, GbaAudio};
+pub use audio::{sampler::GbaAudioSampler, Command, GbaAudio};
 use scheduler::Scheduler;
 use util::bits::Bits;
 pub use video::{GbaVideo, SCREEN_HEIGHT, SCREEN_PIXEL_COUNT, SCREEN_WIDTH};

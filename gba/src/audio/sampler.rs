@@ -47,6 +47,10 @@ impl GbaAudioSampler {
                     self.fifo_b = sample;
                 }
             }
+            Command::SetResolution(resolution) => {
+                self.frequency = resolution.frequency();
+                log::debug!("sampler frequency changed to {}", self.frequency);
+            }
         }
     }
 

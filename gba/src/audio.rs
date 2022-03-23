@@ -1,7 +1,7 @@
 pub mod sampler;
 
 use crate::{
-    memory::io::{FifoChannel, IoRegisters},
+    memory::io::{FifoChannel, IoRegisters, Resolution},
     Gba,
 };
 
@@ -18,6 +18,11 @@ impl GbaAudio {
 
     pub fn commands(&self) -> &[Command] {
         &self.commands
+    }
+
+    fn set_resolution(&mut self, resolution: Resolution, ioregs: &IoRegisters) {
+        self.wait(ioregs.time);
+        self.commands.push(Command::SetResolution(resolution));
     }
 
     fn fifo_play(&mut self, chan: FifoChannel, ioregs: &mut IoRegisters) {
@@ -43,6 +48,11 @@ impl GbaAudio {
     }
 }
 
+pub fn resolution_changed(gba: &mut Gba) {
+    gba.audio
+        .set_resolution(gba.mem.ioregs.soundbias.resolution(), &gba.mem.ioregs);
+}
+
 pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba) {
     if gba.mem.ioregs.soundcnt_h.dma_enable(FifoChannel::A)
         && gba.mem.ioregs.soundcnt_h.dma_timer_select(FifoChannel::A) == timer
@@ -61,4 +71,5 @@ pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba) {
 pub enum Command {
     Wait(u32),
     PlaySample(FifoChannel, i8),
+    SetResolution(Resolution),
 }

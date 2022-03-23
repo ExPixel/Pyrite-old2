@@ -329,6 +329,17 @@ primitive_enum! {
     }
 }
 
+impl Resolution {
+    pub fn frequency(&self) -> u32 {
+        match self {
+            Resolution::Res9bit32khz => 32 * 1024,
+            Resolution::Res8Bit64khz => 64 * 1024,
+            Resolution::Res7Bit128khz => 128 * 1024,
+            Resolution::Res6bit256khz => 256 * 1024,
+        }
+    }
+}
+
 primitive_enum! {
     pub enum Direction: u16 (u32) {
         Decreasing = 0,

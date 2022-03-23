@@ -7,6 +7,10 @@ use std::rc::Rc;
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum EventTag {
+    // Use this tag for events that don't really need to be rescheduled
+    // or inspected ever.
+    None,
+
     HDraw,
     HBlank,
 

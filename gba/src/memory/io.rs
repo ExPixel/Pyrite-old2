@@ -1,7 +1,10 @@
 mod constants;
 mod types;
 
-use crate::scheduler::{EventFn, EventTag};
+use crate::{
+    audio,
+    scheduler::{EventFn, EventTag},
+};
 
 use super::GbaMemory;
 pub use constants::*;
@@ -212,7 +215,14 @@ impl GbaMemory {
             SOUNDCNT_H => self.ioregs.soundcnt_h.set_preserve_bits(value),
             SOUNDCNT_X => self.ioregs.soundcnt_x.set_lo(value),
             SOUNDCNT_X_H => self.ioregs.soundcnt_x.set_hi(value),
-            SOUNDBIAS => self.ioregs.soundbias.set_lo(value),
+            SOUNDBIAS => {
+                let old_resolution = self.ioregs.soundbias.resolution();
+                self.ioregs.soundbias.set_lo(value);
+                if self.ioregs.soundbias.resolution() != old_resolution {
+                    self.scheduler
+                        .schedule(audio::resolution_changed, 0, EventTag::None);
+                }
+            }
             SOUNDBIAS_H => self.ioregs.soundbias.set_hi(value),
             WAVE_RAM0_L => self.ioregs.waveram.store16(0, value),
             WAVE_RAM0_H => self.ioregs.waveram.store16(1, value),

@@ -22,17 +22,25 @@ pub struct GbaDMA {
 
 impl GbaDMA {
     fn copy_registers(&mut self, chan: usize, registers: &DMARegisters) {
-        self.set_count(chan, registers.count);
+        let timing = registers.control.timing();
+        self.set_count(chan, registers.count, timing);
+
+        let (transfer_type, dst_control) = if timing == Timing::Special && (chan == 1 || chan == 2)
+        {
+            (TransferType::Word, AddressControl::Fixed)
+        } else {
+            (
+                registers.control.transfer_type(),
+                registers.control.dst_addr_control(),
+            )
+        };
 
         let (src_mask, dst_mask) = Self::address_masks(chan);
         if !self.repeating {
             self.source = registers.source.value & src_mask;
             self.destination = registers.destination.value & dst_mask;
 
-            self.source_inc = match (
-                registers.control.transfer_type(),
-                registers.control.src_addr_control(),
-            ) {
+            self.source_inc = match (transfer_type, registers.control.src_addr_control()) {
                 (TransferType::Word, AddressControl::Increment) => 4,
                 (TransferType::Word, AddressControl::Decrement) => 4i32 as u32,
                 (TransferType::Halfword, AddressControl::Increment) => 2,
@@ -40,10 +48,7 @@ impl GbaDMA {
                 _ => 0,
             };
 
-            self.destination_inc = match (
-                registers.control.transfer_type(),
-                registers.control.dst_addr_control(),
-            ) {
+            self.destination_inc = match (transfer_type, dst_control) {
                 (TransferType::Word, AddressControl::Increment) => 4,
                 (TransferType::Word, AddressControl::Decrement) => 4i32 as u32,
                 (TransferType::Word, AddressControl::IncrementReload) => 4,
@@ -52,7 +57,7 @@ impl GbaDMA {
                 (TransferType::Halfword, AddressControl::IncrementReload) => 2,
                 _ => 0,
             };
-        } else if registers.control.dst_addr_control() == AddressControl::IncrementReload {
+        } else if dst_control == AddressControl::IncrementReload {
             self.destination = registers.destination.value & dst_mask;
         }
     }
@@ -62,8 +67,10 @@ impl GbaDMA {
         self.destination = self.destination.wrapping_add(self.destination_inc);
     }
 
-    fn set_count(&mut self, chan: usize, count: u16) {
-        self.count = if count == 0 && chan == 3 {
+    fn set_count(&mut self, chan: usize, count: u16, timing: Timing) {
+        self.count = if timing == Timing::Special && (chan == 1 || chan == 2) {
+            4
+        } else if count == 0 && chan == 3 {
             0x10000
         } else if count == 0 {
             0x4000
@@ -108,12 +115,26 @@ pub fn dma_on_timing(gba: &mut Gba, timing: Timing) {
     try_start_dma_for_timing::<3>(gba, timing);
 }
 
+fn timing_match<const DMA: usize>(waiting: Timing, request: Timing) -> bool {
+    if waiting != Timing::Special {
+        return waiting == request;
+    }
+
+    match DMA {
+        0 => false,
+        1 | 2 => request == Timing::SoundFifo,
+        3 => request == Timing::VideoCapture,
+        _ => unreachable!(),
+    }
+}
+
 fn try_start_dma_for_timing<const DMA: usize>(gba: &mut Gba, timing: Timing) {
     if !gba.mem.ioregs.dma[DMA].control.enabled()
-        || gba.mem.ioregs.dma[DMA].control.timing() != timing
+        || !timing_match::<DMA>(gba.mem.ioregs.dma[DMA].control.timing(), timing)
     {
         return;
     }
+
     begin_dma::<DMA>(gba);
 }
 

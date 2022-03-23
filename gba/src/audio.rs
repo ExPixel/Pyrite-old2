@@ -1,7 +1,8 @@
 pub mod sampler;
 
 use crate::{
-    memory::io::{FifoChannel, IoRegisters, Resolution},
+    dma,
+    memory::io::{FifoChannel, IoRegisters, Resolution, Timing},
     Gba,
 };
 
@@ -58,12 +59,20 @@ pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba) {
         && gba.mem.ioregs.soundcnt_h.dma_timer_select(FifoChannel::A) == timer
     {
         gba.audio.fifo_play(FifoChannel::A, &mut gba.mem.ioregs);
+
+        if gba.mem.ioregs.fifo_a.len() <= 16 {
+            dma::dma_on_timing(gba, Timing::SoundFifo);
+        }
     }
 
     if gba.mem.ioregs.soundcnt_h.dma_enable(FifoChannel::B)
         && gba.mem.ioregs.soundcnt_h.dma_timer_select(FifoChannel::B) == timer
     {
         gba.audio.fifo_play(FifoChannel::B, &mut gba.mem.ioregs);
+
+        if gba.mem.ioregs.fifo_b.len() <= 16 {
+            dma::dma_on_timing(gba, Timing::SoundFifo);
+        }
     }
 }
 

@@ -50,6 +50,9 @@ primitive_enum! {
         VBlank,
         HBlank,
         Special,
+
+        SoundFifo,
+        VideoCapture,
     }
 }
 

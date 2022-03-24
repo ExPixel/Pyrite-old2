@@ -75,10 +75,7 @@ pub fn overflow<const TIMER: usize>(gba: &mut Gba) {
         gba.scheduler
             .schedule(overflow::<TIMER>, overflow_cycles, EventTag::timer(TIMER));
     }
-
-    for _ in 0..overflows {
-        after_overflow(TIMER, gba);
-    }
+    after_overflow(TIMER, gba);
 
     let mut idx = TIMER + 1;
     while overflows > 0 && idx < 4 {
@@ -95,11 +92,10 @@ pub fn overflow<const TIMER: usize>(gba: &mut Gba) {
             timer.counter = timer.reload;
         }
         timer.counter += rem as u16;
-        idx += 1;
-
         for _ in 0..overflows {
             after_overflow(idx, gba);
         }
+        idx += 1;
     }
 }
 

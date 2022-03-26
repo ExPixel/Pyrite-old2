@@ -1,0 +1,16 @@
+[package]
+name = "egui-debugger"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pyrite = { path = "../pyrite" }
+gba = { path = "../gba" }
+util = { path = "../util" }
+egui = "0.17"
+log = "0.4"
+parking_lot = "0.12"
+
+[dependencies.crossbeam]
+version = "0.8"
+default-features = false

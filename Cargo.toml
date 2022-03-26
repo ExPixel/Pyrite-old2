@@ -1,5 +1,5 @@
 [workspace]
-members = ["pyrite", "gba", "arm", "pyrite-sdl", "util"]
+members = ["pyrite", "gba", "arm", "pyrite-gl", "util", "egui-debugger"]
 resolver = "2"
 
 [profile.dev]

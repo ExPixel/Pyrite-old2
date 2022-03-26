@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
 };
 
@@ -27,16 +28,18 @@ fn gba_thread_fn(rx: Receiver<GbaMessage>) {
         let frame_start_time = Instant::now();
 
         ctx.gba.frame();
+        ctx.state.frame_duration = frame_start_time.elapsed();
+
         ctx.on_frame
             .iter_mut()
-            .for_each(|cb| (cb)(&mut ctx.gba, &mut ctx.state));
+            .for_each(|(_, cb)| (cb)(&mut ctx.gba, &mut ctx.state));
         empty_gba_message_queue(&mut ctx, &rx);
 
         if ctx.state.paused {
             wait_for_gba_unpause(&mut ctx, &rx);
         } else {
             let frame_duration = frame_start_time.elapsed();
-            ctx.state.frame_duration = frame_duration;
+            ctx.state.frame_processing_duration = frame_duration;
             let target_frame_duration = Duration::from_secs_f64(1.0 / ctx.state.target_fps);
             if frame_duration < target_frame_duration {
                 spin_sleeper.sleep(target_frame_duration - frame_duration);
@@ -80,7 +83,8 @@ fn process_gba_message(ctx: &mut Context, msg: GbaMessage) {
             ctx.state.stopped = true;
         }
         GbaMessage::CallbackAfterFrame(cb) => (cb)(&mut ctx.gba, &mut ctx.state),
-        GbaMessage::CallbackOnFrame(cb) => ctx.on_frame.push(cb),
+        GbaMessage::CallbackOnFrame(id, cb) => ctx.on_frame.push((id, cb)),
+        GbaMessage::RemoveOnFrameCallback(rm_id) => ctx.on_frame.retain(|&(id, _)| id != rm_id),
     }
 }
 
@@ -88,7 +92,7 @@ fn process_gba_message(ctx: &mut Context, msg: GbaMessage) {
 struct Context {
     gba: Gba,
     state: GbaThreadState,
-    on_frame: Vec<GbaThreadCallback>,
+    on_frame: Vec<(CallbackId, GbaThreadCallback)>,
 }
 
 #[derive(Default)]
@@ -98,6 +102,9 @@ pub struct GbaThreadState {
     pub target_fps: f64,
 
     frame_duration: Duration,
+
+    /// Duration including drawing the frame and running all of the callbacks.
+    frame_processing_duration: Duration,
 }
 
 impl GbaThreadState {
@@ -109,9 +116,15 @@ impl GbaThreadState {
         self.stopped
     }
 
-    /// Returns the amount of time required to render the previous frame.
+    /// Returns the amount of time required to render the current frame.
     pub fn frame_duration(&self) -> Duration {
         self.frame_duration
+    }
+
+    /// Returns the amount of time required to render the previous frame
+    /// and run all of the callbacks.
+    pub fn frame_processing_duration(&self) -> Duration {
+        self.frame_processing_duration
     }
 }
 
@@ -129,16 +142,30 @@ impl GbaHandle {
         GbaHandle { tx, parker }
     }
 
-    pub fn on_frame<F>(&self, cb: F)
+    pub fn shutdown(&self) {
+        let _ = self.tx.send(GbaMessage::Shutdown);
+    }
+
+    pub fn on_frame<F>(&self, cb: F) -> CallbackId
     where
         F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
     {
+        let id = CallbackId::next_id();
         if self
             .tx
-            .send(GbaMessage::CallbackOnFrame(Box::new(cb)))
+            .send(GbaMessage::CallbackOnFrame(id, Box::new(cb)))
             .is_err()
         {
-            log::warn!("called `on_frame` on disconnected GBA handle")
+            log::warn!("called `on_frame` on disconnected GBA handle");
+            CallbackId(0)
+        } else {
+            id
+        }
+    }
+
+    pub fn remove_on_frame(&self, id: CallbackId) {
+        if self.tx.send(GbaMessage::RemoveOnFrameCallback(id)).is_err() {
+            log::warn!("called `remove_on_frame` on disconnected GBA handle");
         }
     }
 
@@ -192,12 +219,6 @@ impl Clone for GbaHandle {
     }
 }
 
-impl Drop for GbaHandle {
-    fn drop(&mut self) {
-        let _ = self.tx.send(GbaMessage::Shutdown);
-    }
-}
-
 impl Default for GbaHandle {
     fn default() -> Self {
         Self::new()
@@ -206,6 +227,18 @@ impl Default for GbaHandle {
 
 enum GbaMessage {
     CallbackAfterFrame(GbaThreadCallbackOnce),
-    CallbackOnFrame(GbaThreadCallback),
+    CallbackOnFrame(CallbackId, GbaThreadCallback),
+    RemoveOnFrameCallback(CallbackId),
     Shutdown,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct CallbackId(u64);
+
+impl CallbackId {
+    fn next_id() -> Self {
+        static NEXT_CALLBACK_ID: AtomicU64 = AtomicU64::new(1);
+        let id = NEXT_CALLBACK_ID.fetch_add(1, Ordering::Relaxed);
+        CallbackId(id)
+    }
 }

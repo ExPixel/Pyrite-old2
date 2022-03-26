@@ -7,3 +7,4 @@ pub mod circular;
 pub mod fixedpoint;
 pub mod mem;
 pub mod sort;
+pub mod spinlock;

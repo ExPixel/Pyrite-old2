@@ -1,0 +1,25 @@
+[package]
+name = "pyrite-gl"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pyrite = { path = "../pyrite" }
+gba = { path = "../gba" }
+util = { path = "../util" }
+debugger = { path = "../egui-debugger", package = "egui-debugger" }
+glutin = "0.28"
+glow = "0.11"
+pollster = "0.2"
+anyhow = "1"
+log = "0.4"
+pretty_env_logger = "0.4"
+rodio = "0.15"
+egui_glow = "0.17"
+parking_lot = "0.12"
+
+[dependencies.crossbeam]
+version = "0.8"
+default-features = false

@@ -63,8 +63,11 @@ impl<T, const CAPACITY: usize> CircularBuffer<T, CAPACITY> {
             self.head.wrapping_sub(self.tail) % CAPACITY
         }
     }
-}
 
+    pub fn iter(&self) -> CircularBufferIter<'_, T, CAPACITY> {
+        CircularBufferIter::new(self)
+    }
+}
 impl<T, const CAPACITY: usize> Default for CircularBuffer<T, CAPACITY> {
     fn default() -> Self {
         CircularBuffer {
@@ -82,6 +85,42 @@ impl<T, const CAPACITY: usize> Drop for CircularBuffer<T, CAPACITY> {
         self.clear();
     }
 }
+
+pub struct CircularBufferIter<'b, T, const CAPACITY: usize> {
+    done: bool,
+    offset: usize,
+    buffer: &'b CircularBuffer<T, CAPACITY>,
+}
+
+impl<'b, T, const CAPACITY: usize> CircularBufferIter<'b, T, CAPACITY> {
+    fn new(buffer: &'b CircularBuffer<T, CAPACITY>) -> Self {
+        CircularBufferIter {
+            offset: buffer.tail,
+            done: buffer.is_empty(),
+            buffer,
+        }
+    }
+}
+
+impl<'b, T, const CAPACITY: usize> Iterator for CircularBufferIter<'b, T, CAPACITY> {
+    type Item = &'b T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let entry = unsafe { self.buffer.data[self.offset].as_ptr().as_ref().unwrap() };
+        self.offset = (self.offset + 1) % CAPACITY;
+        self.done = self.offset == self.buffer.head;
+        Some(entry)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.buffer.len(), Some(self.buffer.len()))
+    }
+}
+
+impl<'b, T, const CAPACITY: usize> ExactSizeIterator for CircularBufferIter<'b, T, CAPACITY> {}
 
 #[cfg(test)]
 mod test {
@@ -121,6 +160,10 @@ mod test {
         assert!(!buffer.is_full());
 
         (0..NU32).for_each(|n| buffer.push(CountDrop::new(n)));
+        buffer.iter().zip(0..(NU32 * 2)).for_each(|(x, n)| {
+            let y = CountDrop::new(n);
+            assert_eq!(*x, y);
+        });
         assert_eq!(CountDrop::active(), NUSIZE);
         assert_eq!(buffer.len(), NUSIZE);
         assert!(!buffer.is_empty());
@@ -133,6 +176,13 @@ mod test {
         assert!(!buffer.is_full());
 
         (0..(NU32 * 2)).for_each(|n| buffer.push(CountDrop::new(n)));
+        buffer
+            .iter()
+            .zip((0..(NU32 * 2)).skip(NUSIZE as usize))
+            .for_each(|(x, n)| {
+                let y = CountDrop::new(n);
+                assert_eq!(*x, y);
+            });
         assert_eq!(CountDrop::active(), NUSIZE);
         assert_eq!(buffer.len(), NUSIZE);
         assert!(!buffer.is_empty());

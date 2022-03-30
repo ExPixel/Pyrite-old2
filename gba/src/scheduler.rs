@@ -61,23 +61,24 @@ pub struct Scheduler {
 
 impl Scheduler {
     pub fn schedule(&self, callback: EventFn, cycles: impl Into<Cycles>, tag: EventTag) {
-        self.inner.borrow_mut().schedule(Event {
-            callback,
-            cycles_remaining: cycles.into(),
-            tag,
-        });
+        let cycles = cycles.into();
+        self.inner.borrow_mut().schedule(cycles, callback, tag);
     }
 
     pub fn unschedule(&self, tag: EventTag) {
         self.inner.borrow_mut().unschedule(tag);
     }
 
-    pub fn advance(&self, cycles: impl Into<Cycles>) -> Option<(EventFn, Cycles)> {
-        self.inner.borrow_mut().advance(cycles.into())
+    pub fn next(&self, new_time: u64) -> Option<(EventFn, u64)> {
+        self.inner.borrow_mut().next(new_time)
     }
 
-    pub fn next_event_cycles(&self) -> Option<arm::Cycles> {
-        self.inner.borrow().next_event_cycles()
+    pub fn cycles_until_next_event(&self, now: u64) -> Option<Cycles> {
+        self.inner.borrow().cycles_until_next_event(now)
+    }
+
+    pub fn time(&self) -> u64 {
+        self.inner.borrow().time
     }
 
     pub(crate) fn clear(&self) {
@@ -87,56 +88,74 @@ impl Scheduler {
     #[cfg(test)]
     pub fn dump(&self) {
         for (idx, event) in self.inner.borrow().events.iter().enumerate() {
-            println!("EVENT{}: {} cycles", idx, event.cycles_remaining);
+            println!("EVENT{idx}: {}", event.when);
         }
     }
 }
 
 pub struct Event {
+    when: u64,
     callback: EventFn,
-    cycles_remaining: Cycles,
     tag: EventTag,
 }
 
 #[derive(Default)]
 struct Inner {
     events: VecDeque<Event>,
+    time: u64,
 }
 
 impl Inner {
-    fn schedule(&mut self, mut new_event: Event) {
+    fn schedule(&mut self, cycles: arm::Cycles, cb: EventFn, tag: EventTag) {
+        let when = self.time + u32::from(cycles) as u64;
+
         let mut insert_idx = self.events.len();
-        for (idx, event) in self.events.iter_mut().enumerate() {
-            if new_event.cycles_remaining < event.cycles_remaining {
-                event.cycles_remaining -= new_event.cycles_remaining;
-                insert_idx = idx;
-                break;
+        for (idx, event) in self.events.iter().enumerate() {
+            if event.when <= when {
+                continue;
             }
-            new_event.cycles_remaining -= event.cycles_remaining;
+            insert_idx = idx;
+            break;
         }
-        self.events.insert(insert_idx, new_event);
+
+        let event = Event {
+            when,
+            callback: cb,
+            tag,
+        };
+        self.events.insert(insert_idx, event);
     }
 
     fn unschedule(&mut self, tag: EventTag) {
         self.events.retain(|event| event.tag != tag);
     }
 
-    fn advance(&mut self, cycles: Cycles) -> Option<(EventFn, Cycles)> {
-        if let Some(event) = self.events.front_mut() {
-            if event.cycles_remaining > cycles {
-                event.cycles_remaining -= cycles;
+    fn next(&mut self, new_time: u64) -> Option<(EventFn, u64)> {
+        if let Some(event) = self.events.front() {
+            if event.when > new_time {
+                self.time = new_time;
                 return None;
             }
         } else {
+            self.time = new_time;
             return None;
         }
 
         let event = self.events.pop_front().unwrap();
-        Some((event.callback, cycles - event.cycles_remaining))
+        self.time = event.when;
+        Some((event.callback, event.when))
     }
 
-    fn next_event_cycles(&self) -> Option<arm::Cycles> {
-        self.events.front().map(|event| event.cycles_remaining)
+    fn cycles_until_next_event(&self, now: u64) -> Option<Cycles> {
+        if let Some(event) = self.events.front() {
+            if event.when > now {
+                Some(Cycles::from((event.when - now) as u32))
+            } else {
+                Some(Cycles::ZERO)
+            }
+        } else {
+            None
+        }
     }
 
     fn clear(&mut self) {
@@ -146,8 +165,6 @@ impl Inner {
 
 #[cfg(test)]
 mod test {
-    use arm::Cycles;
-
     use crate::{scheduler::EventTag, Gba};
 
     use super::Scheduler;
@@ -163,29 +180,30 @@ mod test {
         scheduler.schedule(|_| data()[2] = 1, 13u32, EventTag::HBlank);
         scheduler.dump();
 
-        assert!(scheduler.advance(6u32).is_none());
+        assert!(scheduler.next(6).is_none());
         assert_eq!(data()[0], 0);
 
-        let (cb, cycles) = scheduler.advance(6u32).expect("expected event");
-        assert_eq!(cycles, Cycles::from(2u32));
+        let (cb, now) = scheduler.next(10).expect("expected event");
+        assert_eq!(now, 10);
         cb(&mut gba);
-        assert!(scheduler.advance(cycles).is_none());
+        assert!(scheduler.next(10).is_none());
         assert_eq!(*data(), [1, 0, 0, 0]);
 
-        let (cb, cycles) = scheduler.advance(Cycles::ONE).expect("expected event");
-        assert_eq!(cycles, Cycles::ZERO);
+        let (cb, now) = scheduler.next(13).expect("expected event");
+        assert_eq!(now, 13);
         cb(&mut gba);
         assert_eq!(*data(), [1, 1, 0, 0]);
-        let (cb, cycles) = scheduler.advance(cycles).expect("expected event");
-        assert_eq!(cycles, Cycles::ZERO);
+        let (cb, now) = scheduler.next(13).expect("expected event");
+        assert_eq!(now, 13);
         cb(&mut gba);
-        assert!(scheduler.advance(cycles).is_none());
         assert_eq!(*data(), [1, 1, 1, 0]);
+        assert!(scheduler.next(13).is_none());
 
-        let (cb, cycles) = scheduler.advance(8).expect("expected event");
-        assert_eq!(cycles, Cycles::from(4u32));
+        let (cb, now) = scheduler.next(20).expect("expected event");
+        assert_eq!(now, 17);
         cb(&mut gba);
-        assert!(scheduler.advance(cycles).is_none());
+        assert!(scheduler.next(20).is_none());
+        assert_eq!(scheduler.time(), 20);
         assert_eq!(*data(), [1, 1, 1, 1]);
 
         static mut DATA: [u32; 4] = [0; 4];

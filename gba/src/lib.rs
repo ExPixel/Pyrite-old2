@@ -126,7 +126,7 @@ impl Gba {
             Cycles::ZERO
         } else {
             self.scheduler
-                .next_event_cycles()
+                .cycles_until_next_event(self.mem.ioregs.time)
                 .unwrap_or(Cycles::new(32))
         }
     }
@@ -140,18 +140,12 @@ impl Gba {
     }
 
     fn step(&mut self) {
-        let mut cycles = (self.step_fn)(self);
-
-        loop {
-            if let Some((event, next_cycles)) = self.scheduler.advance(cycles) {
-                self.mem.ioregs.time += (u32::from(cycles) - u32::from(next_cycles)) as u64;
-                cycles = next_cycles;
-                (event)(self);
-            } else {
-                self.mem.ioregs.time += u32::from(cycles) as u64;
-                break;
-            }
+        let now = self.mem.ioregs.time + u32::from((self.step_fn)(self)) as u64;
+        while let Some((event, when)) = self.scheduler.next(now) {
+            self.mem.ioregs.time = when;
+            (event)(self);
         }
+        self.mem.ioregs.time = now;
     }
 
     pub(crate) fn stop(&mut self) {

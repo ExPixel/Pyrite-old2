@@ -16,7 +16,7 @@ pollster = "0.2"
 anyhow = "1"
 log = "0.4"
 pretty_env_logger = "0.4"
-rodio = "0.15"
+cpal = "0.13"
 egui_glow = "0.17"
 parking_lot = "0.12"
 

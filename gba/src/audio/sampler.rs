@@ -11,7 +11,6 @@ pub struct GbaAudioSampler {
 
 impl GbaAudioSampler {
     pub fn new(native_frequency: u32) -> Self {
-        // assert!(native_frequency.is_power_of_two());
         GbaAudioSampler {
             native_frequency: native_frequency as f64,
             fifo_a: 0.0,
@@ -20,11 +19,11 @@ impl GbaAudioSampler {
         }
     }
 
-    pub fn frame(&mut self) -> (f32, f32) {
+    pub fn frame(&mut self, volume_coeff: f32) -> (f32, f32) {
         if self.wait_frames >= 0.0 {
             self.wait_frames -= 1.0;
         }
-        (self.fifo_a, self.fifo_a)
+        (self.fifo_a * volume_coeff, self.fifo_a * volume_coeff)
     }
 
     fn wait_cycles(&mut self, cycles: u32) {
@@ -53,6 +52,6 @@ impl GbaAudioSampler {
     }
 
     pub fn needs_commands(&self) -> bool {
-        self.wait_frames <= 1.0
+        self.wait_frames < 1.0
     }
 }

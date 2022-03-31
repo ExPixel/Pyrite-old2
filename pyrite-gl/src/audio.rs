@@ -1,36 +1,42 @@
 use anyhow::Context as _;
+use cpal::{
+    traits::{DeviceTrait as _, HostTrait as _, StreamTrait as _},
+    Stream,
+};
 use crossbeam::queue::SegQueue;
 use gba::{Command, GbaAudioSampler};
 use pyrite::GbaHandle;
-use rodio::{OutputStream, Sink, Source};
 use std::sync::Arc;
 
-const COMMANDS_CHUNK_SIZE: usize = 16;
+const COMMANDS_CHUNK_SIZE: usize = 64;
 
-pub fn run(gba: GbaHandle) -> anyhow::Result<OutputStream> {
-    let (stream, stream_handle) =
-        rodio::OutputStream::try_default().context("error while getting default output stream")?;
-    let output = Sink::try_new(&stream_handle).context("failed to create audio sink")?;
-
+pub fn run(gba: GbaHandle) -> anyhow::Result<Stream> {
+    let host = cpal::default_host();
+    let device = host
+        .default_output_device()
+        .ok_or_else(|| anyhow::Error::msg("no default output device"))?;
+    let config = device
+        .default_output_config()
+        .context("error retrieving default output configuration")?;
     let commands_buffer_queue: Arc<SegQueue<[Command; COMMANDS_CHUNK_SIZE]>> =
         Arc::new(SegQueue::new());
 
-    let sound_source = GbaSoundSource::new(Arc::clone(&commands_buffer_queue));
-    stream_handle
-        .play_raw(sound_source)
-        .context("error occurred while playing GBA sound source")?;
+    let mut sound_source =
+        GbaSoundSource::new(config.sample_rate().0, Arc::clone(&commands_buffer_queue));
+    let channels = config.channels() as usize;
+    let stream = device
+        .build_output_stream(
+            &config.into(),
+            move |data: &mut [f32], _| sound_source.output(channels, data),
+            |err| {
+                log::error!("audio stream error: {err}");
+            },
+        )
+        .context("failed to build output stream")?;
+    stream.play().context("failed to play audio stream")?;
 
     let mut last_chunk_count = 0usize;
-    gba.on_frame(move |gba, state| {
-        let output_is_paused = output.is_paused();
-
-        if state.paused {
-            if !output_is_paused {
-                output.pause();
-            }
-            return;
-        }
-
+    gba.on_frame(move |gba, _| {
         let gba_audio_commands = gba.audio().commands();
 
         // Check to make sure that we have at most 2 frames worth of commands
@@ -49,16 +55,11 @@ pub fn run(gba: GbaHandle) -> anyhow::Result<OutputStream> {
         } else {
             log::debug!("missed frame audio command queue");
         }
-
-        if output_is_paused {
-            output.play();
-        }
     });
     Ok(stream)
 }
 
 struct GbaSoundSource {
-    right_channel_sample: Option<f32>,
     sampler: GbaAudioSampler,
     commands: Box<[Command; COMMANDS_CHUNK_SIZE]>,
     commands_idx: usize,
@@ -66,10 +67,9 @@ struct GbaSoundSource {
 }
 
 impl GbaSoundSource {
-    fn new(commands_buffer: Arc<SegQueue<[Command; COMMANDS_CHUNK_SIZE]>>) -> Self {
+    fn new(frequency: u32, commands_buffer: Arc<SegQueue<[Command; COMMANDS_CHUNK_SIZE]>>) -> Self {
         GbaSoundSource {
-            right_channel_sample: None,
-            sampler: GbaAudioSampler::new(32768),
+            sampler: GbaAudioSampler::new(frequency),
             commands: Box::new([Command::Wait(0); COMMANDS_CHUNK_SIZE]),
             commands_idx: 0,
             commands_buffer,
@@ -96,44 +96,27 @@ impl GbaSoundSource {
             Some(self.commands[idx])
         }
     }
-}
 
-impl Iterator for GbaSoundSource {
-    type Item = f32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(right_sample) = self.right_channel_sample.take() {
-            return Some(right_sample * 0.05);
-        }
-
-        while self.sampler.needs_commands() {
-            if let Some(command) = self.next_command() {
-                self.sampler.command(command);
-            } else {
-                break;
+    fn output(&mut self, channels: usize, samples: &mut [f32]) {
+        samples.chunks_exact_mut(channels).for_each(|frame| {
+            while self.sampler.needs_commands() {
+                if let Some(command) = self.next_command() {
+                    self.sampler.command(command);
+                } else {
+                    break;
+                }
             }
-        }
 
-        let frame = self.sampler.frame();
-        self.right_channel_sample = Some(frame.1);
-        Some(frame.0 * 0.05)
-    }
-}
+            if channels >= 2 {
+                (frame[0], frame[1]) = self.sampler.frame(0.15);
+            } else {
+                let (left, right) = self.sampler.frame(0.15);
+                frame[0] = (left + right) / 2.0;
+            }
 
-impl Source for GbaSoundSource {
-    fn current_frame_len(&self) -> Option<usize> {
-        None
-    }
-
-    fn channels(&self) -> u16 {
-        2
-    }
-
-    fn sample_rate(&self) -> u32 {
-        32768
-    }
-
-    fn total_duration(&self) -> Option<std::time::Duration> {
-        None
+            if channels > 2 {
+                frame[2..].fill(0.0);
+            }
+        });
     }
 }

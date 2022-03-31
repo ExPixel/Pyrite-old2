@@ -1,5 +1,8 @@
-use egui::{plot::Bar, Color32, Context, Grid, Ui, Visuals};
-use gba::Gba;
+use egui::{
+    plot::{Bar, BarChart, Line, Plot, Value, Values},
+    Color32, Context, Grid, Ui, Visuals,
+};
+use gba::{Command, Gba, GbaAudioSampler};
 use parking_lot::Mutex;
 use pyrite::{CallbackId, GbaHandle, GbaThreadState};
 use std::{sync::Arc, time::Duration};
@@ -8,6 +11,8 @@ use util::circular::CircularBuffer;
 #[derive(Default)]
 pub struct Debugger {
     performance_pane: PerformancePane,
+    audio_pane: AudioPane,
+
     has_initialized: bool,
 
     gba_data: GbaData,
@@ -22,10 +27,15 @@ impl Debugger {
             self.has_initialized = true;
         } else {
             self.fetch_updated_data();
+
+            if self.gba_data.updated {
+                ctx.request_repaint();
+            }
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.performance_pane.render(ctx, ui, &mut self.gba_data);
+            // self.performance_pane.render(ui, &mut self.gba_data);
+            self.audio_pane.render(ui, &mut self.gba_data);
         });
     }
 
@@ -57,7 +67,96 @@ impl Debugger {
 }
 
 #[derive(Default)]
-struct AudioPane {}
+struct AudioPane {
+    samples_l: CircularBuffer<f32, { Self::BUFFER_SIZE }>,
+    samples_r: CircularBuffer<f32, { Self::BUFFER_SIZE }>,
+    commands_buffer_sizes: CircularBuffer<u32, { Self::FRAMES }>,
+}
+
+impl AudioPane {
+    const RENDER_SAMPLES: u32 = 1024;
+    const FRAMES: usize = 16;
+    const BUFFER_SIZE: usize = Self::FRAMES * Self::RENDER_SAMPLES as usize;
+
+    fn render(&mut self, ui: &mut Ui, data: &mut GbaData) {
+        self.get_data(data);
+        Grid::new("GBA Frame Durations Grid")
+            .num_columns(2)
+            .striped(true)
+            .show(ui, |ui| {
+                ui.label("Output");
+                self.render_samples_plot(ui);
+                ui.end_row();
+
+                ui.label("Commands");
+                self.render_commands_buffer_plot(ui);
+                ui.end_row();
+            });
+    }
+
+    fn render_commands_buffer_plot(&mut self, ui: &mut Ui) {
+        let mut bars = Vec::with_capacity(self.commands_buffer_sizes.len());
+        for (idx, &size) in self.commands_buffer_sizes.iter().enumerate() {
+            bars.push(Bar::new(idx as f64, size as f64));
+        }
+
+        let chart = BarChart::new(bars).name("GBA Frame Processing Duration");
+        Plot::new("Command Buffer Sizes")
+            .allow_drag(false)
+            .allow_zoom(false)
+            .show(ui, |plot_ui| {
+                plot_ui.bar_chart(chart);
+            });
+    }
+
+    fn render_samples_plot(&mut self, ui: &mut Ui) {
+        let samples_l = self
+            .samples_l
+            .iter()
+            .enumerate()
+            .map(|(idx, &s)| Value::new(idx as f64, s));
+        let samples_r = self
+            .samples_r
+            .iter()
+            .enumerate()
+            .map(|(idx, &s)| Value::new(idx as f64, s));
+
+        let line_l = Line::new(Values::from_values_iter(samples_l)).color(rgb(0x228be6));
+        let line_r = Line::new(Values::from_values_iter(samples_r)).color(rgb(0xae3ec9));
+
+        Plot::new("Samples")
+            .allow_drag(true)
+            .allow_zoom(true)
+            .include_y(1.0)
+            .include_y(-1.0)
+            .show(ui, |plot_ui| {
+                plot_ui.line(line_l);
+                plot_ui.line(line_r);
+            });
+    }
+
+    fn get_data(&mut self, data: &mut GbaData) {
+        if std::mem::take(&mut data.has_audio_commands) {
+            self.commands_buffer_sizes
+                .push(data.audio_commands.len() as u32);
+            let mut sampler = GbaAudioSampler::new(Self::RENDER_SAMPLES);
+            for _ in 0..Self::RENDER_SAMPLES {
+                while sampler.needs_commands() {
+                    if let Some(command) = data.audio_commands.pop() {
+                        sampler.command(command);
+                    } else {
+                        break;
+                    }
+                }
+
+                let (l, r) = sampler.frame(1.0);
+                self.samples_l.push(l);
+                self.samples_r.push(r);
+            }
+        }
+        data.requests.audio_data = true;
+    }
+}
 
 #[derive(Default)]
 struct PerformancePane {
@@ -68,16 +167,17 @@ struct PerformancePane {
 impl PerformancePane {
     const GBA_MAX_FRAME_DUR: f64 = 1000.0 / 60.0;
 
-    fn render(&mut self, ctx: &Context, ui: &mut Ui, data: &mut GbaData) {
+    const GOOD_FRAME_COLOR: Color32 = Color32::from_rgb(0x37, 0xb2, 0x4d);
+    const BAD_FRAME_COLOR: Color32 = Color32::from_rgb(0xf0, 0x3e, 0x3e);
+
+    fn render(&mut self, ui: &mut Ui, data: &mut GbaData) {
         if let Some(duration) = data.frame_duration.take() {
             self.frame_times.push(duration.as_secs_f64() * 1000.0);
-            ctx.request_repaint();
         }
 
         if let Some(duration) = data.frame_processing_duration.take() {
             self.frame_processing_times
                 .push(duration.as_secs_f64() * 1000.0);
-            ctx.request_repaint();
         }
 
         self.render_frame_times(ui);
@@ -121,20 +221,19 @@ impl PerformancePane {
             .allow_drag(false)
             .allow_zoom(false)
             .include_y(Self::GBA_MAX_FRAME_DUR)
-            .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+            .show(ui, |plot_ui| {
+                plot_ui.bar_chart(chart);
+            });
     }
 
     fn render_frame_times_plot(&mut self, ui: &mut Ui) {
-        use egui::plot::{BarChart, Plot};
-
-        const GOOD_FRAME_COLOR: Color32 = Color32::from_rgb(0x37, 0xb2, 0x4d);
-        const BAD_FRAME_COLOR: Color32 = Color32::from_rgb(0xf0, 0x3e, 0x3e);
+        use egui::plot::{BarChart, HLine, Plot};
 
         let bar_color = |t: f64| -> Color32 {
             if t > 4.0 {
-                BAD_FRAME_COLOR
+                Self::BAD_FRAME_COLOR
             } else {
-                GOOD_FRAME_COLOR
+                Self::GOOD_FRAME_COLOR
             }
         };
 
@@ -151,7 +250,10 @@ impl PerformancePane {
             .allow_drag(false)
             .allow_zoom(false)
             .include_y(Self::GBA_MAX_FRAME_DUR)
-            .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+            .show(ui, |plot_ui| {
+                plot_ui.hline(HLine::new(4.0).color(Self::BAD_FRAME_COLOR));
+                plot_ui.bar_chart(chart);
+            });
     }
 
     fn render_frame_times(&mut self, ui: &mut Ui) {
@@ -177,6 +279,9 @@ struct GbaData {
     frame_duration: Option<Duration>,
     frame_processing_duration: Option<Duration>,
 
+    audio_commands: Vec<Command>,
+    has_audio_commands: bool,
+
     updated: bool,
     requests: GbaDataRequests,
 }
@@ -193,6 +298,15 @@ impl GbaData {
         self.frame_duration = source.frame_duration.take();
         self.frame_processing_duration = source.frame_processing_duration.take();
 
+        if self.requests.audio_data {
+            self.audio_commands.clear();
+            self.audio_commands
+                .extend(source.audio_commands.iter().rev().copied());
+            self.has_audio_commands = source.has_audio_commands;
+        } else {
+            self.has_audio_commands = false;
+        }
+
         source.requests = std::mem::take(&mut self.requests);
     }
 }
@@ -200,12 +314,26 @@ impl GbaData {
 #[derive(Default)]
 struct GbaDataRequests {
     frame_duration: bool,
+    audio_data: bool,
 }
 
-fn pull_data_from_gba(data: &mut GbaData, _gba: &mut Gba, state: &mut GbaThreadState) {
+fn pull_data_from_gba(data: &mut GbaData, gba: &mut Gba, state: &mut GbaThreadState) {
     if data.requests.frame_duration {
         data.frame_duration = Some(state.frame_duration());
         data.frame_processing_duration = Some(state.frame_processing_duration());
     }
+
+    if data.requests.audio_data {
+        data.audio_commands.clear();
+        data.audio_commands.extend(gba.audio().commands());
+        data.has_audio_commands = true;
+    } else {
+        data.has_audio_commands = false;
+    }
+
     data.updated = true;
+}
+
+const fn rgb(col: u32) -> Color32 {
+    Color32::from_rgb((col >> 16) as u8, (col >> 8) as u8, col as u8)
 }

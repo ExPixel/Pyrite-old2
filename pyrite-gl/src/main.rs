@@ -19,8 +19,8 @@ use pyrite_window::PyriteWindow;
 
 struct Windows {
     gba_handle: GbaHandle,
-    gba: GbaWindow,
-    debugger: Option<DebuggerWindow>,
+    gba: Box<GbaWindow>,
+    debugger: Option<Box<DebuggerWindow>>,
     config: std::sync::Arc<Config>,
 }
 
@@ -33,7 +33,9 @@ impl Windows {
         Ok(Windows {
             config: config.clone(),
             gba_handle: gba.clone(),
-            gba: GbaWindow::new(config, window, gba).context("error while creating GBA window")?,
+            gba: Box::new(
+                GbaWindow::new(config, window, gba).context("error while creating GBA window")?,
+            ),
             debugger: None,
         })
     }
@@ -66,10 +68,10 @@ impl Windows {
         F: FnOnce(&mut dyn PyriteWindow),
     {
         if self.is_gba(id) {
-            f(&mut self.gba);
+            f(&mut *self.gba);
         } else if self.is_debugger(id) {
             if let Some(ref mut debugger) = self.debugger {
-                f(debugger)
+                f(&mut **debugger)
             }
         }
     }
@@ -91,10 +93,10 @@ impl Windows {
                 .map_err(|err| anyhow::anyhow!("{:?}", err))
                 .context("failed to make window current")?
         };
-        self.debugger = Some(
+        self.debugger = Some(Box::new(
             DebuggerWindow::new(self.gba_handle.clone(), window)
                 .context("error while creating debugger window")?,
-        );
+        ));
 
         Ok(())
     }

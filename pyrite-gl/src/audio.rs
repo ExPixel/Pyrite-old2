@@ -21,6 +21,11 @@ pub fn run(gba: GbaHandle) -> anyhow::Result<Stream> {
     let commands_buffer_queue: Arc<SegQueue<[Command; COMMANDS_CHUNK_SIZE]>> =
         Arc::new(SegQueue::new());
 
+    log::debug!("audio sample rate: {}", config.sample_rate().0);
+    log::debug!("audio channels: {}", config.channels());
+    log::debug!("audio sample format: {:?}", config.sample_format());
+    log::debug!("audio buffer size: {:?}", config.buffer_size());
+
     let mut sound_source =
         GbaSoundSource::new(config.sample_rate().0, Arc::clone(&commands_buffer_queue));
     let channels = config.channels() as usize;

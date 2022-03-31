@@ -57,8 +57,6 @@ pub fn run(gba: GbaHandle) -> anyhow::Result<Stream> {
                     commands_buffer_queue.push(chunk);
                     last_chunk_count += 1;
                 });
-        } else {
-            log::debug!("missed frame audio command queue");
         }
     });
     Ok(stream)

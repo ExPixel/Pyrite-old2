@@ -13,8 +13,9 @@ pub struct GbaAudio {
 }
 
 impl GbaAudio {
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self, now: u64) {
         self.commands.clear();
+        self.last_update_time = now;
     }
 
     pub fn commands(&self) -> &[Command] {

@@ -100,7 +100,7 @@ impl Gba {
     }
 
     pub fn frame(&mut self) {
-        self.audio.clear();
+        self.audio.clear(self.mem.ioregs.time);
 
         // wait until we are out of VBLANK
         while self.mem.ioregs.dispstat.vblank() {

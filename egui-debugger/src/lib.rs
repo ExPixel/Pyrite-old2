@@ -1,5 +1,5 @@
 use egui::{
-    plot::{Bar, BarChart, Line, Plot, Value, Values},
+    plot::{Bar, BarChart, HLine, Line, Plot, Value, Values},
     Color32, Context, Grid, Ui, Visuals,
 };
 use gba::{Command, Gba, GbaAudioSampler};
@@ -10,6 +10,7 @@ use util::circular::CircularBuffer;
 
 #[derive(Default)]
 pub struct Debugger {
+    current_pane: Pane,
     performance_pane: PerformancePane,
     audio_pane: AudioPane,
 
@@ -34,8 +35,15 @@ impl Debugger {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // self.performance_pane.render(ui, &mut self.gba_data);
-            self.audio_pane.render(ui, &mut self.gba_data);
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.current_pane, Pane::Performance, "Performance");
+                ui.selectable_value(&mut self.current_pane, Pane::Audio, "Audio");
+            });
+
+            match self.current_pane {
+                Pane::Performance => self.performance_pane.render(ui, &mut self.gba_data),
+                Pane::Audio => self.audio_pane.render(ui, &mut self.gba_data),
+            }
         });
     }
 
@@ -63,6 +71,18 @@ impl Debugger {
         if let Some(cb) = self.frame_callback.take() {
             gba.remove_on_frame(cb);
         }
+    }
+}
+
+#[derive(PartialEq, Clone, Copy)]
+enum Pane {
+    Performance,
+    Audio,
+}
+
+impl Default for Pane {
+    fn default() -> Self {
+        Self::Performance
     }
 }
 
@@ -100,7 +120,7 @@ impl AudioPane {
             bars.push(Bar::new(idx as f64, size as f64));
         }
 
-        let chart = BarChart::new(bars).name("GBA Frame Processing Duration");
+        let chart = BarChart::new(bars).name("Command Buffer Size Chart");
         Plot::new("Command Buffer Sizes")
             .allow_drag(false)
             .allow_zoom(false)
@@ -125,6 +145,7 @@ impl AudioPane {
         let line_r = Line::new(Values::from_values_iter(samples_r)).color(rgb(0xae3ec9));
 
         Plot::new("Samples")
+            .show_axes([false, false])
             .allow_drag(true)
             .allow_zoom(true)
             .include_y(1.0)
@@ -149,7 +170,7 @@ impl AudioPane {
                     }
                 }
 
-                let (l, r) = sampler.frame(1.0);
+                let (l, r) = sampler.frame();
                 self.samples_l.push(l);
                 self.samples_r.push(r);
             }
@@ -203,7 +224,6 @@ impl PerformancePane {
     }
 
     fn render_processing_times_plot(&mut self, ui: &mut Ui) {
-        use egui::plot::{BarChart, Plot};
         const PROCESSING_COLOR: Color32 = Color32::from_rgb(0x1c, 0x7e, 0xd6);
         let mut bars = Vec::with_capacity(self.frame_processing_times.len());
         for (idx, &t) in self.frame_processing_times.iter().skip(1).enumerate() {
@@ -227,8 +247,6 @@ impl PerformancePane {
     }
 
     fn render_frame_times_plot(&mut self, ui: &mut Ui) {
-        use egui::plot::{BarChart, HLine, Plot};
-
         let bar_color = |t: f64| -> Color32 {
             if t > 4.0 {
                 Self::BAD_FRAME_COLOR

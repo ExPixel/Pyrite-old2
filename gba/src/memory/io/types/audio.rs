@@ -277,6 +277,8 @@ bitfields! {
         [7]     master_enable, set_master_enable: bool,
         [0,15]  lo, set_lo: u16,
         [16,31] hi, set_hi: u16,
+
+        readonly = 0x0000000F
     }
 }
 

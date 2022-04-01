@@ -27,14 +27,19 @@ impl GbaAudio {
         self.commands.push(Command::SetResolution(resolution));
     }
 
-    fn fifo_play(&mut self, chan: FifoChannel, ioregs: &mut IoRegisters) {
+    fn set_bias(&mut self, bias: u16, ioregs: &IoRegisters) {
         self.wait(ioregs.time);
-        let sample = if chan == FifoChannel::A {
+        self.commands.push(Command::SetBias(bias));
+    }
+
+    fn fifo_play(&mut self, channel: FifoChannel, ioregs: &mut IoRegisters) {
+        self.wait(ioregs.time);
+        let sample = if channel == FifoChannel::A {
             ioregs.fifo_a.pop_sample()
         } else {
             ioregs.fifo_b.pop_sample()
-        };
-        self.commands.push(Command::PlaySample(chan, sample as i8));
+        } as i8;
+        self.commands.push(Command::PlaySample { channel, sample });
     }
 
     fn wait(&mut self, now: u64) {
@@ -53,6 +58,11 @@ impl GbaAudio {
 pub fn resolution_changed(gba: &mut Gba) {
     gba.audio
         .set_resolution(gba.mem.ioregs.soundbias.resolution(), &gba.mem.ioregs);
+}
+
+pub fn bias_changed(gba: &mut Gba) {
+    gba.audio
+        .set_bias(gba.mem.ioregs.soundbias.bias(), &gba.mem.ioregs);
 }
 
 pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba) {
@@ -80,6 +90,7 @@ pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba) {
 #[derive(Clone, Copy, Debug)]
 pub enum Command {
     Wait(u32),
-    PlaySample(FifoChannel, i8),
+    PlaySample { channel: FifoChannel, sample: i8 },
     SetResolution(Resolution),
+    SetBias(u16),
 }

@@ -216,11 +216,15 @@ impl GbaMemory {
             SOUNDCNT_X => self.ioregs.soundcnt_x.set_lo(value),
             SOUNDCNT_X_H => self.ioregs.soundcnt_x.set_hi(value),
             SOUNDBIAS => {
-                let old_resolution = self.ioregs.soundbias.resolution();
+                let old = self.ioregs.soundbias;
                 self.ioregs.soundbias.set_lo(value);
-                if self.ioregs.soundbias.resolution() != old_resolution {
+                if self.ioregs.soundbias.resolution() != old.resolution() {
                     self.scheduler
                         .schedule(audio::resolution_changed, 0, EventTag::None);
+                }
+                if self.ioregs.soundbias.bias() != old.bias() {
+                    self.scheduler
+                        .schedule(audio::bias_changed, 0, EventTag::None);
                 }
             }
             SOUNDBIAS_H => self.ioregs.soundbias.set_hi(value),

@@ -110,11 +110,13 @@ impl GbaSoundSource {
                 }
             }
 
+            const VOLUME: f32 = 0.15;
+            let (out_l, out_r) = self.sampler.frame();
+
             if channels >= 2 {
-                (frame[0], frame[1]) = self.sampler.frame(0.15);
+                (frame[0], frame[1]) = (out_l * VOLUME, out_r * VOLUME);
             } else {
-                let (left, right) = self.sampler.frame(0.15);
-                frame[0] = (left + right) / 2.0;
+                frame[0] = ((out_l + out_r) / 2.0) * VOLUME;
             }
 
             if channels > 2 {

@@ -106,4 +106,8 @@ impl PyriteWindow for DebuggerWindow {
     fn modifiers_mut(&mut self) -> &mut ModifiersState {
         &mut self.modifiers
     }
+
+    fn gl(&self) -> &glow::Context {
+        &self.gl
+    }
 }

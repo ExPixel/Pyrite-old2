@@ -1,3 +1,4 @@
+use glow::HasContext as _;
 use glutin::{
     event::{ModifiersState, WindowEvent},
     event_loop::ControlFlow,
@@ -7,8 +8,10 @@ use glutin::{
 
 pub trait PyriteWindow {
     fn process_window_event(&mut self, event: WindowEvent) {
-        if let WindowEvent::ModifiersChanged(modifiers) = event {
-            *self.modifiers_mut() = modifiers;
+        match event {
+            WindowEvent::ModifiersChanged(modifiers) => *self.modifiers_mut() = modifiers,
+            WindowEvent::Resized(size) => self.context().resize(size),
+            _ => (),
         }
         self.on_window_event(event)
     }
@@ -19,6 +22,13 @@ pub trait PyriteWindow {
         if !self.try_swap_context() {
             return;
         }
+
+        let size = self.window().inner_size();
+        unsafe {
+            self.gl()
+                .viewport(0, 0, size.width as i32, size.height as i32)
+        };
+
         self.render();
         self.present();
     }
@@ -57,6 +67,8 @@ pub trait PyriteWindow {
     fn context(&self) -> &WindowedContext<PossiblyCurrent> {
         self.context_opt().as_ref().unwrap()
     }
+
+    fn gl(&self) -> &glow::Context;
 
     fn present(&mut self) {
         if let Err(err) = self.context_opt().as_ref().unwrap().swap_buffers() {

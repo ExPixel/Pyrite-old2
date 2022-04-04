@@ -237,7 +237,7 @@ impl PyriteWindow for GbaWindow {
     }
 
     fn render(&mut self) {
-        glutil::clear(&self.gl, 0.2, 0.5, 0.5);
+        glutil::clear(&self.gl, 0.5, 0.2, 0.5);
 
         if self
             .screen_ready
@@ -271,6 +271,10 @@ impl PyriteWindow for GbaWindow {
 
     fn modifiers_mut(&mut self) -> &mut ModifiersState {
         &mut self.modifiers
+    }
+
+    fn gl(&self) -> &glow::Context {
+        &self.gl
     }
 }
 

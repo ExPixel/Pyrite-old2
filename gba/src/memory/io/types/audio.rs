@@ -346,6 +346,15 @@ impl Resolution {
             Resolution::Res6bit256khz => 256 * 1024,
         }
     }
+
+    pub fn bit_depth(&self) -> u32 {
+        match self {
+            Resolution::Res9bit32khz => 9,
+            Resolution::Res8Bit64khz => 8,
+            Resolution::Res7Bit128khz => 7,
+            Resolution::Res6bit256khz => 6,
+        }
+    }
 }
 
 primitive_enum! {

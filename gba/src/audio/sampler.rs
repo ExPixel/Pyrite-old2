@@ -102,7 +102,9 @@ impl GbaAudioSampler {
             Command::SetBias(bias) => self.bias = bias as i16,
             Command::SetResolution(resolution) => {
                 // FIXME: Frequency is currently ignored. Should it continue to be this way?
-                log::debug!("GBA frequency changed to {}", resolution.frequency());
+                let frequency = resolution.frequency();
+                let bits = resolution.bit_depth();
+                log::debug!("GBA resolution change: frequency={frequency}, bit-depth={bits}");
             }
 
             Command::SetPSGSweepControl(value) => {}

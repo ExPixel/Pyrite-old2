@@ -2,7 +2,10 @@ pub mod sampler;
 
 use crate::{
     dma,
-    memory::io::{FifoChannel, IoRegisters, Resolution, Timing},
+    memory::io::{
+        DutyLenEnvelope, FifoChannel, FreqControl, IoRegisters, PSGChannel, Resolution,
+        SweepControl, Timing,
+    },
     Gba,
 };
 
@@ -20,6 +23,27 @@ impl GbaAudio {
 
     pub fn commands(&self) -> &[Command] {
         &self.commands
+    }
+
+    fn set_psg_sweep_control(&mut self, value: SweepControl, ioregs: &IoRegisters) {
+        self.wait(ioregs.time);
+        self.commands.push(Command::SetPSGSweepControl(value));
+    }
+
+    fn set_psg_duty_len_env(
+        &mut self,
+        chan: PSGChannel,
+        value: DutyLenEnvelope,
+        ioregs: &IoRegisters,
+    ) {
+        self.wait(ioregs.time);
+        self.commands
+            .push(Command::SetPSGDutyLenEnvelope(chan, value));
+    }
+
+    fn set_psg_freq_control(&mut self, chan: PSGChannel, value: FreqControl, ioregs: &IoRegisters) {
+        self.wait(ioregs.time);
+        self.commands.push(Command::SetPSGFreqControl(chan, value));
     }
 
     fn set_resolution(&mut self, resolution: Resolution, ioregs: &IoRegisters) {
@@ -53,6 +77,31 @@ impl GbaAudio {
         }
         self.last_update_time = now;
     }
+}
+
+pub fn psg_sweep_changed(gba: &mut Gba) {
+    gba.audio
+        .set_psg_sweep_control(gba.mem.ioregs.sound1cnt_l, &gba.mem.ioregs);
+}
+
+pub fn psg_duty_len_env_changed<const PSG: u32>(gba: &mut Gba) {
+    let (channel, reg) = match PSG {
+        1 => (PSGChannel::Sound1, gba.mem.ioregs.sound1cnt_h),
+        2 => (PSGChannel::Sound2, gba.mem.ioregs.sound2cnt_l),
+        _ => unreachable!(),
+    };
+    gba.audio
+        .set_psg_duty_len_env(channel, reg, &gba.mem.ioregs);
+}
+
+pub fn psg_freq_control_changed<const PSG: u32>(gba: &mut Gba) {
+    let (channel, reg) = match PSG {
+        1 => (PSGChannel::Sound1, gba.mem.ioregs.sound1cnt_x),
+        2 => (PSGChannel::Sound2, gba.mem.ioregs.sound2cnt_h),
+        _ => unreachable!(),
+    };
+    gba.audio
+        .set_psg_freq_control(channel, reg, &gba.mem.ioregs);
 }
 
 pub fn resolution_changed(gba: &mut Gba) {
@@ -93,4 +142,8 @@ pub enum Command {
     PlaySample { channel: FifoChannel, sample: i8 },
     SetResolution(Resolution),
     SetBias(u16),
+
+    SetPSGSweepControl(SweepControl),
+    SetPSGDutyLenEnvelope(PSGChannel, DutyLenEnvelope),
+    SetPSGFreqControl(PSGChannel, FreqControl),
 }

@@ -1,29 +1,41 @@
-use crate::memory::io::FifoChannel;
+use crate::memory::io::{Direction, FifoChannel, PSGChannel};
 
 use super::Command;
 
 pub struct GbaAudioSampler {
-    native_frequency: f64,
+    native_frequency: u32,
+    native_frequency_f: f64,
 
     // FIFO samples
     fifo_a: i8,
     fifo_b: i8,
+
+    // PSG outputs BEFORE volumes for left and right channels are
+    // applied. This DOES take into the account the master volume
+    // that is set in the DMA Sound Control/Mixing register.
     bias: i16,
     wait_frames: f64,
+
+    sound1: SquareWave,
+    sound2: SquareWave,
 }
 
 impl GbaAudioSampler {
     pub fn new(native_frequency: u32) -> Self {
         GbaAudioSampler {
-            native_frequency: native_frequency as f64,
+            native_frequency,
+            native_frequency_f: native_frequency as f64,
             fifo_a: 0,
             fifo_b: 0,
             bias: 0x100,
             wait_frames: 0.0,
+
+            sound1: SquareWave::default(),
+            sound2: SquareWave::default(),
         }
     }
 
-    fn generate_output(&mut self) -> (f32, f32) {
+    fn generate_output_frame(&mut self) -> (f32, f32) {
         const GBA_RANGE_RECIP: f32 = 1.0 / 1024.0;
 
         // Each of the two FIFOs can span the FULL output range (+/-200h).
@@ -38,8 +50,13 @@ impl GbaAudioSampler {
 
         // Each of the four PSGs can span one QUARTER of the output range (+/-80h).
         // FIXME implement PSG output
-        let psg_l = [0i16; 4];
-        let psg_r = [0i16; 4];
+        let psg = [self.sound1.frame(), self.sound2.frame(), 0, 0];
+        let mut psg_l = [0i16; 4];
+        let mut psg_r = [0i16; 4];
+
+        // FIXME temporary, eventually this will apply volume to each element first.
+        psg_l[..4].clone_from_slice(&psg[..4]);
+        psg_r[..4].clone_from_slice(&psg[..4]);
 
         let psg_l: i16 = psg_l.iter().sum();
         let psg_r: i16 = psg_r.iter().sum();
@@ -63,12 +80,12 @@ impl GbaAudioSampler {
         if self.wait_frames >= 0.0 {
             self.wait_frames -= 1.0;
         }
-        self.generate_output()
+        self.generate_output_frame()
     }
 
     fn wait_cycles(&mut self, cycles: u32) {
         const GBA_FREQ: f64 = 1.0 / (16.0 * 1024.0 * 1024.0);
-        self.wait_frames += (cycles as f64 * self.native_frequency) * GBA_FREQ;
+        self.wait_frames += (cycles as f64 * self.native_frequency_f) * GBA_FREQ;
     }
 
     pub fn command(&mut self, command: Command) {
@@ -87,10 +104,131 @@ impl GbaAudioSampler {
                 // FIXME: Frequency is currently ignored. Should it continue to be this way?
                 log::debug!("GBA frequency changed to {}", resolution.frequency());
             }
+
+            Command::SetPSGSweepControl(value) => {}
+
+            Command::SetPSGDutyLenEnvelope(chan, value) => {
+                let sound = match chan {
+                    PSGChannel::Sound1 => &mut self.sound1,
+                    PSGChannel::Sound2 => &mut self.sound2,
+                    _ => unreachable!(),
+                };
+                sound.set_duty_gba(value.wave_pattern_duty());
+                sound.initial_length = (self.native_frequency * (64 - value.length() as u32)) / 256;
+                sound.initial_volume = value.initial_envelope_volume() as i16;
+                sound.initial_next_volume_frames =
+                    (self.native_frequency * value.envelope_step_time() as u32) / 64;
+                let dir = value.envelope_direction();
+                sound.volume_inc = direction_as_int(dir) as i16;
+                sound.volume_target = if dir == Direction::Increasing { 15 } else { 0 };
+            }
+
+            Command::SetPSGFreqControl(chan, value) => {
+                let sound = match chan {
+                    PSGChannel::Sound1 => &mut self.sound1,
+                    PSGChannel::Sound2 => &mut self.sound2,
+                    _ => unreachable!(),
+                };
+                sound.set_frequency(value.frequency(), self.native_frequency);
+
+                if value.initial() {
+                    sound.expires = value.length_flag();
+                    sound.length = sound.initial_length;
+                    sound.next_volume_frames = sound.initial_next_volume_frames;
+                    sound.set_volume(sound.initial_volume);
+                }
+            }
         }
     }
 
     pub fn needs_commands(&self) -> bool {
         self.wait_frames < 0.5
+    }
+}
+
+#[derive(Default)]
+struct SquareWave {
+    phase: u32,
+    phase_inc: u32,
+    duty: u32,
+
+    initial_length: u32,
+    length: u32,
+    expires: bool,
+
+    initial_next_volume_frames: u32,
+    next_volume_frames: u32,
+    initial_volume: i16,
+    volume: i16,
+    volume_inc: i16,
+    volume_target: i16,
+
+    /// The output of the wave when it is high.
+    output: i16,
+}
+
+impl SquareWave {
+    fn set_frequency(&mut self, frequency: u32, native_frequency: u32) {
+        debug_assert!(frequency < native_frequency);
+        self.phase_inc = (u32::MAX / native_frequency) * frequency;
+    }
+
+    fn set_volume(&mut self, volume: i16) {
+        self.volume = volume;
+        self.output = (0x80 * self.volume) / 15;
+    }
+
+    fn step_envelope(&mut self) {
+        if self.volume == self.volume_target || self.next_volume_frames == 0 {
+            // If we reach here the envelope is disabled.
+            return;
+        }
+
+        self.next_volume_frames -= 1;
+        if self.next_volume_frames > 0 {
+            return;
+        }
+
+        self.next_volume_frames = self.initial_next_volume_frames;
+        self.set_volume(self.volume + self.volume_inc);
+    }
+
+    /// Wave Duty:  
+    /// 0: 12.5% ( -_______-_______-_______ )  
+    /// 1: 25%   ( --______--______--______ )  
+    /// 2: 50%   ( ----____----____----____ ) (normal)  
+    /// 3: 75%   ( ------__------__------__ )  
+    fn set_duty_gba(&mut self, gba_duty: u16) {
+        log::debug!("SET DUTY = {gba_duty}");
+        self.duty = match gba_duty {
+            0 => 0x1fffffff,
+            1 => 0x3fffffff,
+            2 => 0x7fffffff,
+            3 => 0xbfffffff,
+            _ => unreachable!("invalid wave duty"),
+        };
+    }
+
+    /// Returns `volume` if the square wave is high for this frame, or 0 if the
+    /// square wave is currently low.
+    fn frame(&mut self) -> i16 {
+        let running = !self.expires || (self.length > 0);
+        let output = if running && self.phase <= self.duty {
+            self.output
+        } else {
+            0
+        };
+        self.step_envelope();
+        self.length = self.length.saturating_sub(1);
+        self.phase = self.phase.wrapping_add(self.phase_inc);
+        output
+    }
+}
+
+fn direction_as_int(direction: Direction) -> i32 {
+    if direction == Direction::Increasing {
+        1
+    } else {
+        -1
     }
 }

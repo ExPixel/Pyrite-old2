@@ -63,6 +63,12 @@ bitfields! {
     }
 }
 
+impl FreqControl {
+    pub fn frequency(&self) -> u32 {
+        131072 / (2048 - self.freq_setting() as u32)
+    }
+}
+
 bitfields! {
     /// 4000070h - SOUND3CNT_L (NR30) - Channel 3 Stop/Wave RAM select (R/W)
     /// Bit        Expl.

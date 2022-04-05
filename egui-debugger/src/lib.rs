@@ -86,8 +86,8 @@ impl Default for Pane {
     }
 }
 
-#[derive(Default)]
 struct AudioPane {
+    sampler: GbaAudioSampler,
     samples_l: CircularBuffer<f32, { Self::BUFFER_SIZE }>,
     samples_r: CircularBuffer<f32, { Self::BUFFER_SIZE }>,
     commands_buffer_sizes: CircularBuffer<u32, { Self::FRAMES }>,
@@ -160,22 +160,32 @@ impl AudioPane {
         if std::mem::take(&mut data.has_audio_commands) {
             self.commands_buffer_sizes
                 .push(data.audio_commands.len() as u32);
-            let mut sampler = GbaAudioSampler::new(Self::RENDER_SAMPLES);
             for _ in 0..Self::RENDER_SAMPLES {
-                while sampler.needs_commands() {
+                while self.sampler.needs_commands() {
                     if let Some(command) = data.audio_commands.pop() {
-                        sampler.command(command);
+                        self.sampler.command(command);
                     } else {
                         break;
                     }
                 }
 
-                let (l, r) = sampler.frame();
+                let (l, r) = self.sampler.frame();
                 self.samples_l.push(l);
                 self.samples_r.push(r);
             }
         }
         data.requests.audio_data = true;
+    }
+}
+
+impl Default for AudioPane {
+    fn default() -> Self {
+        AudioPane {
+            sampler: GbaAudioSampler::new(Self::RENDER_SAMPLES),
+            samples_l: Default::default(),
+            samples_r: Default::default(),
+            commands_buffer_sizes: Default::default(),
+        }
     }
 }
 

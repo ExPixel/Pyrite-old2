@@ -17,7 +17,7 @@ impl SweepControl {
     pub fn direction(&self) -> Direction {
         // NOTE: direction is reversed for this register relative
         //       to its other uses.
-        Direction::from(!self.value.bit(3))
+        Direction::from(1 - self.value.bit(3))
     }
 
     pub fn set_direction(&mut self, direction: Direction) {
@@ -60,12 +60,6 @@ bitfields! {
         [15]    initial, set_initial: bool,
         [0,15]  lo, set_lo: u16,
         [16,31] hi, set_hi: u16,
-    }
-}
-
-impl FreqControl {
-    pub fn frequency(&self) -> u32 {
-        131072 / (2048 - self.freq_setting() as u32)
     }
 }
 

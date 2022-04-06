@@ -6,16 +6,25 @@ use crate::{
         DutyLenEnvelope, FifoChannel, FreqControl, IoRegisters, PSGChannel, Resolution,
         SweepControl, Timing,
     },
+    scheduler::{EventTag, Scheduler},
     Gba,
 };
 
 #[derive(Default)]
 pub struct GbaAudio {
+    scheduler: Scheduler,
     commands: Vec<Command>,
     last_update_time: u64,
 }
 
 impl GbaAudio {
+    pub fn new(scheduler: Scheduler) -> GbaAudio {
+        GbaAudio {
+            scheduler,
+            commands: Vec::with_capacity(1024),
+            last_update_time: 0,
+        }
+    }
     pub fn clear(&mut self, now: u64) {
         self.commands.clear();
         self.last_update_time = now;

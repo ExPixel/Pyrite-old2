@@ -28,6 +28,7 @@ pub struct Gba {
 }
 
 impl Gba {
+    pub const CYCLES_PER_SECOND: u32 = 16 * 1024 * 1024;
     pub fn new() -> Gba {
         let scheduler = Scheduler::default();
 
@@ -42,7 +43,7 @@ impl Gba {
             ],
             in_dma: false,
             video: GbaVideo::new(scheduler.clone()),
-            audio: GbaAudio::default(),
+            audio: GbaAudio::new(scheduler.clone()),
             scheduler,
             state: State::Running,
             step_fn: Self::step_cpu,

@@ -1,3 +1,5 @@
+use crate::memory::io::PSGChannel;
+
 use super::Gba;
 use arm::Cycles;
 use std::cell::RefCell;
@@ -28,16 +30,30 @@ pub enum EventTag {
 
     Stop,
     Halt,
+
+    StopPSG1,
+    StopPSG2,
+    StopPSG3,
+    StopPSG4,
 }
 
 impl EventTag {
     pub fn timer(timer: usize) -> EventTag {
         match timer {
-            0 => EventTag::Timer0,
-            1 => EventTag::Timer1,
-            2 => EventTag::Timer2,
-            3 => EventTag::Timer3,
+            0 => Self::Timer0,
+            1 => Self::Timer1,
+            2 => Self::Timer2,
+            3 => Self::Timer3,
             _ => panic!("invalid timer for event tag"),
+        }
+    }
+
+    pub fn stop_psg(psg: PSGChannel) -> EventTag {
+        match psg {
+            PSGChannel::Sound1 => Self::StopPSG1,
+            PSGChannel::Sound2 => Self::StopPSG2,
+            PSGChannel::Sound3 => Self::StopPSG3,
+            PSGChannel::Sound4 => Self::StopPSG4,
         }
     }
 
@@ -61,8 +77,21 @@ pub struct Scheduler {
 
 impl Scheduler {
     pub fn schedule(&self, callback: EventFn, cycles: impl Into<Cycles>, tag: EventTag) {
-        let cycles = cycles.into();
-        self.inner.borrow_mut().schedule(cycles, callback, tag);
+        self.inner
+            .borrow_mut()
+            .schedule(cycles.into(), callback, tag);
+    }
+
+    pub fn reschedule(&self, callback: EventFn, cycles: impl Into<Cycles>, tag: EventTag) {
+        let mut sched = self.inner.borrow_mut();
+        sched.unschedule(tag);
+        sched.schedule(cycles.into(), callback, tag);
+    }
+
+    pub fn reschedule_ealier(&self, callback: EventFn, cycles: impl Into<Cycles>, tag: EventTag) {
+        self.inner
+            .borrow_mut()
+            .reschedule_ealier(cycles.into(), callback, tag);
     }
 
     pub fn unschedule(&self, tag: EventTag) {
@@ -124,6 +153,21 @@ impl Inner {
             tag,
         };
         self.events.insert(insert_idx, event);
+    }
+
+    fn reschedule_ealier(&mut self, cycles: arm::Cycles, cb: EventFn, tag: EventTag) {
+        let when = self.time + u32::from(cycles) as u64;
+
+        let mut did_remove = false;
+        self.events.retain(|event| {
+            let should_remove = event.tag == tag && event.when > when;
+            did_remove |= should_remove;
+            !should_remove
+        });
+
+        if did_remove {
+            self.schedule(cycles, cb, tag);
+        }
     }
 
     fn unschedule(&mut self, tag: EventTag) {

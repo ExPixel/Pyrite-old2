@@ -31,10 +31,14 @@ pub enum EventTag {
     Stop,
     Halt,
 
-    StopPSG1,
-    StopPSG2,
-    StopPSG3,
-    StopPSG4,
+    LengthEndPSG1,
+    LengthEndPSG2,
+    LengthEndPSG3,
+    LengthEndPSG4,
+    EnvelopeTickPSG1,
+    EnvelopeTickPSG2,
+    EnvelopeTickPSG4,
+    SweepTickPSG1,
 }
 
 impl EventTag {
@@ -48,12 +52,21 @@ impl EventTag {
         }
     }
 
-    pub fn stop_psg(psg: PSGChannel) -> EventTag {
+    pub fn psg_length_end(psg: PSGChannel) -> EventTag {
         match psg {
-            PSGChannel::Sound1 => Self::StopPSG1,
-            PSGChannel::Sound2 => Self::StopPSG2,
-            PSGChannel::Sound3 => Self::StopPSG3,
-            PSGChannel::Sound4 => Self::StopPSG4,
+            PSGChannel::Sound1 => Self::LengthEndPSG1,
+            PSGChannel::Sound2 => Self::LengthEndPSG2,
+            PSGChannel::Sound3 => Self::LengthEndPSG3,
+            PSGChannel::Sound4 => Self::LengthEndPSG4,
+        }
+    }
+
+    pub fn psg_envelope_tick(psg: PSGChannel) -> EventTag {
+        match psg {
+            PSGChannel::Sound1 => Self::EnvelopeTickPSG1,
+            PSGChannel::Sound2 => Self::EnvelopeTickPSG2,
+            PSGChannel::Sound3 => panic!("invalid PSG for envelope tick"),
+            PSGChannel::Sound4 => Self::EnvelopeTickPSG4,
         }
     }
 
@@ -98,6 +111,13 @@ impl Scheduler {
         self.inner.borrow_mut().unschedule(tag);
     }
 
+    pub fn unschedule_matching<F>(&self, predicate: F)
+    where
+        F: FnMut(&Event) -> bool,
+    {
+        self.inner.borrow_mut().unschedule_matching(predicate);
+    }
+
     pub fn next(&self, new_time: u64) -> Option<(EventFn, u64)> {
         self.inner.borrow_mut().next(new_time)
     }
@@ -123,9 +143,9 @@ impl Scheduler {
 }
 
 pub struct Event {
-    when: u64,
+    pub when: u64,
     callback: EventFn,
-    tag: EventTag,
+    pub tag: EventTag,
 }
 
 #[derive(Default)]
@@ -157,17 +177,26 @@ impl Inner {
 
     fn reschedule_ealier(&mut self, cycles: arm::Cycles, cb: EventFn, tag: EventTag) {
         let when = self.time + u32::from(cycles) as u64;
-
-        let mut did_remove = false;
-        self.events.retain(|event| {
-            let should_remove = event.tag == tag && event.when > when;
-            did_remove |= should_remove;
-            !should_remove
-        });
-
-        if did_remove {
+        let removed = self.unschedule_matching(|event| event.tag == tag && event.when > when);
+        if removed > 0 {
             self.schedule(cycles, cb, tag);
         }
+    }
+
+    fn unschedule_matching<F>(&mut self, mut predicate: F) -> usize
+    where
+        F: FnMut(&Event) -> bool,
+    {
+        let mut removed = 0;
+        self.events.retain(|event| {
+            if predicate(event) {
+                removed += 1;
+                false
+            } else {
+                true
+            }
+        });
+        removed
     }
 
     fn unschedule(&mut self, tag: EventTag) {

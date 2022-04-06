@@ -110,7 +110,7 @@ impl GbaSoundSource {
                 }
             }
 
-            const VOLUME: f32 = 0.15;
+            const VOLUME: f32 = 0.25;
             let (out_l, out_r) = self.sampler.frame();
 
             // protect my ears, ty

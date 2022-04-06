@@ -134,7 +134,7 @@ bitfields! {
     pub struct LengthEnvelope: u32 {
         [0,5]   length, set_length: u16,
         [8,10]  envelope_step_time, set_envelope_step_time: u16,
-        [11]    direction, set_direction: Direction,
+        [11]    envelope_direction, set_envelope_direction: Direction,
         [12,15] initial_volume, set_initial_volume: u16,
 
         [0,15]  lo, set_lo: u16,
@@ -285,6 +285,10 @@ bitfields! {
 impl SoundOnOff {
     pub fn sound_on(&self, channel: PSGChannel) -> bool {
         self.value.is_bit_set(u32::from(channel))
+    }
+
+    pub fn set_sound_on(&mut self, channel: PSGChannel, on: bool) {
+        self.value = self.value.replace_bit(u32::from(channel), on);
     }
 }
 

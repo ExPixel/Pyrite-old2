@@ -12,7 +12,7 @@ pub struct GbaAudio {
     scheduler: Scheduler,
     commands: Vec<Command>,
     last_update_time: u64,
-    psg_volumes: [u16; 4],
+    psg_envelope_volumes: [u16; 4],
 }
 
 impl GbaAudio {
@@ -21,7 +21,7 @@ impl GbaAudio {
             scheduler,
             commands: Vec::with_capacity(1024),
             last_update_time: 0,
-            psg_volumes: [0; 4],
+            psg_envelope_volumes: [0; 4],
         }
     }
 
@@ -57,16 +57,18 @@ impl GbaAudio {
         let volume_index = u16::from(chan) as usize;
 
         let reschedule = if direction == Direction::Increasing {
-            self.psg_volumes[volume_index] += 1;
-            self.psg_volumes[volume_index] < 15
+            self.psg_envelope_volumes[volume_index] += 1;
+            self.psg_envelope_volumes[volume_index] < 15
         } else {
-            self.psg_volumes[volume_index] -= 1;
-            self.psg_volumes[volume_index] > 0
+            self.psg_envelope_volumes[volume_index] -= 1;
+            self.psg_envelope_volumes[volume_index] > 0
         };
 
         self.wait(ioregs.time);
-        self.commands
-            .push(Command::SetPSGVolume(chan, self.psg_volumes[volume_index]));
+        self.commands.push(Command::SetPSGEnvelopeVolume(
+            chan,
+            self.psg_envelope_volumes[volume_index],
+        ));
 
         if reschedule {
             self.schedule_psg_envelope_step(chan, ioregs);
@@ -195,9 +197,11 @@ impl GbaAudio {
         if ctl.initial() {
             self.commands
                 .push(Command::SetPSGFrequencyRate(chan, ctl.freq_setting()));
-            self.commands
-                .push(Command::SetPSGVolume(chan, dle.initial_envelope_volume()));
-            self.psg_volumes[u16::from(chan) as usize] = dle.initial_envelope_volume();
+            self.commands.push(Command::SetPSGEnvelopeVolume(
+                chan,
+                dle.initial_envelope_volume(),
+            ));
+            self.psg_envelope_volumes[u16::from(chan) as usize] = dle.initial_envelope_volume();
             self.commands.push(Command::SetPSGEnabled(chan, true));
             ioregs.soundcnt_x.set_sound_on(chan, true);
             ctl.set_initial(false);
@@ -317,5 +321,5 @@ pub enum Command {
     SetPSGEnabled(PSGChannel, bool),
     SetPSGFrequencyRate(PSGChannel, u16),
     SetPSGDuty(PSGChannel, u16),
-    SetPSGVolume(PSGChannel, u16),
+    SetPSGEnvelopeVolume(PSGChannel, u16),
 }

@@ -130,7 +130,7 @@ impl GbaAudioSampler {
                 _ => unreachable!(),
             },
 
-            Command::SetPSGVolume(chan, volume) => match chan {
+            Command::SetPSGEnvelopeVolume(chan, volume) => match chan {
                 PSGChannel::Sound1 => self.sound1.set_volume(volume as i16),
                 PSGChannel::Sound2 => self.sound2.set_volume(volume as i16),
                 PSGChannel::Sound3 => log::debug!("SetPSGVolume(3)"),

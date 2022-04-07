@@ -89,7 +89,7 @@ impl GbaAudio {
             ioregs.sound1cnt_x.set_freq_setting(frate);
             self.wait(ioregs.time);
             self.commands
-                .push(Command::SetPSGFrequencyRate(PSGChannel::Sound1, frate));
+                .push(Command::SetSquareFrequencyRate(PSGChannel::Sound1, frate));
             self.schedule_psg_sweep_step(ioregs);
         }
     }
@@ -102,7 +102,19 @@ impl GbaAudio {
         // FIXME reimplement this
     }
 
-    fn set_psg_duty_len_env(&mut self, chan: PSGChannel, ioregs: &IoRegisters) {
+    fn set_psg_noise_len_env(&mut self, _ioregs: &mut IoRegisters) {
+        // FIXME for now this is a NOP but eventually length
+        // should work like envelopes/sweeps and increment the sound
+        // length in the register every 1/256s.
+    }
+
+    fn set_psg_wave_len(&mut self, _ioregs: &mut IoRegisters) {
+        // FIXME for now this is a NOP but eventually length
+        // should work like envelopes/sweeps and increment the sound
+        // length in the register every 1/256s.
+    }
+
+    fn set_psg_square_duty_len_env(&mut self, chan: PSGChannel, ioregs: &IoRegisters) {
         if !ioregs.soundcnt_x.master_enable() {
             return;
         }
@@ -114,16 +126,27 @@ impl GbaAudio {
             _ => unreachable!(),
         };
         self.commands
-            .push(Command::SetPSGDuty(chan, dle.wave_pattern_duty()));
+            .push(Command::SetSquareDuty(chan, dle.wave_pattern_duty()));
     }
 
     fn unschedule_psg_events(&self, chan: PSGChannel) {
-        let tag_envelope_tick = EventTag::psg_envelope_tick(chan);
+        use PSGChannel::*;
+
+        let tag_envelope_tick = if chan == Sound3 {
+            None
+        } else {
+            Some(EventTag::psg_envelope_tick(chan))
+        };
+        let tag_sweep_tick = if chan == Sound1 {
+            Some(EventTag::SweepTickPSG1)
+        } else {
+            None
+        };
         let tag_length_end = EventTag::psg_length_end(chan);
         self.scheduler.unschedule_matching(|event| {
-            (chan == PSGChannel::Sound1 && event.tag == EventTag::SweepTickPSG1)
-                || event.tag == tag_envelope_tick
-                || event.tag == tag_length_end
+            event.tag == tag_length_end
+                || Some(event.tag) == tag_envelope_tick
+                || Some(event.tag) == tag_sweep_tick
         });
     }
 
@@ -180,13 +203,61 @@ impl GbaAudio {
             .schedule(callback, step_cycles, EventTag::SweepTickPSG1);
     }
 
-    fn set_psg_freq_control(&mut self, chan: PSGChannel, ioregs: &mut IoRegisters) {
+    fn set_psg_noise_freq_control(&mut self, ioregs: &mut IoRegisters) {
         use PSGChannel::*;
 
         if !ioregs.soundcnt_x.master_enable() {
             return;
         }
+
+        // Because initial is always set to false here placing this code
+        // outside of the conditional below allows these registers to be modified while
+        // the sound is running.
         self.wait(ioregs.time);
+        self.commands.push(Command::SetNoiseFrequencyParams {
+            r: ioregs.sound4cnt_h.r() as u8,
+            s: ioregs.sound4cnt_h.s() as u8,
+        });
+        self.commands
+            .push(Command::SetNoiseCounterWidth(ioregs.sound4cnt_h.width()));
+
+        if ioregs.sound4cnt_h.initial() {
+            self.commands.push(Command::SetPSGEnvelopeVolume(
+                Sound4,
+                ioregs.sound4cnt_l.initial_envelope_volume(),
+            ));
+            self.psg_envelope_volumes[u16::from(Sound4) as usize] =
+                ioregs.sound4cnt_l.initial_envelope_volume();
+            self.commands.push(Command::SetPSGEnabled(Sound4, true));
+            ioregs.soundcnt_x.set_sound_on(Sound4, true);
+            ioregs.sound4cnt_h.set_initial(false);
+            self.unschedule_psg_events(Sound4);
+
+            if ioregs.sound4cnt_h.length_flag() {
+                self.schedule_psg_length_end(Sound4, ioregs);
+            }
+
+            if ioregs.sound4cnt_l.envelope_step_time() > 0
+                && ioregs.sound4cnt_l.initial_envelope_volume() > 0
+            {
+                self.schedule_psg_envelope_step(Sound4, ioregs);
+            }
+        }
+    }
+
+    fn set_psg_wave_freq_control(&mut self, ioregs: &mut IoRegisters) {
+        if !ioregs.soundcnt_x.master_enable() {
+            return;
+        }
+        log::debug!("set_psg_wave_freq_control");
+    }
+
+    fn set_psg_square_freq_control(&mut self, chan: PSGChannel, ioregs: &mut IoRegisters) {
+        use PSGChannel::*;
+
+        if !ioregs.soundcnt_x.master_enable() {
+            return;
+        }
 
         let (ctl, dle) = match chan {
             Sound1 => (&mut ioregs.sound1cnt_x, ioregs.sound1cnt_h),
@@ -195,8 +266,9 @@ impl GbaAudio {
         };
 
         if ctl.initial() {
+            self.wait(ioregs.time);
             self.commands
-                .push(Command::SetPSGFrequencyRate(chan, ctl.freq_setting()));
+                .push(Command::SetSquareFrequencyRate(chan, ctl.freq_setting()));
             self.commands.push(Command::SetPSGEnvelopeVolume(
                 chan,
                 dle.initial_envelope_volume(),
@@ -211,7 +283,7 @@ impl GbaAudio {
                 self.schedule_psg_length_end(chan, ioregs);
             }
 
-            if chan != Sound3 && dle.envelope_step_time() > 0 && dle.initial_envelope_volume() > 0 {
+            if dle.envelope_step_time() > 0 && dle.initial_envelope_volume() > 0 {
                 self.schedule_psg_envelope_step(chan, ioregs);
             }
 
@@ -261,22 +333,38 @@ pub fn psg_sweep_changed(gba: &mut Gba) {
     gba.audio.set_psg_sweep_control(&gba.mem.ioregs);
 }
 
+pub fn psg_nosie_len_env_changed(gba: &mut Gba) {
+    gba.audio.set_psg_noise_len_env(&mut gba.mem.ioregs);
+}
+
+pub fn psg_wave_len_env_changed(gba: &mut Gba) {
+    gba.audio.set_psg_wave_len(&mut gba.mem.ioregs);
+}
+
 pub fn psg_duty_len_env_changed<const PSG: u32>(gba: &mut Gba) {
     let channel = match PSG {
         1 => PSGChannel::Sound1,
         2 => PSGChannel::Sound2,
         _ => unreachable!(),
     };
-    gba.audio.set_psg_duty_len_env(channel, &gba.mem.ioregs);
+    gba.audio
+        .set_psg_square_duty_len_env(channel, &gba.mem.ioregs);
 }
 
 pub fn psg_freq_control_changed<const PSG: u32>(gba: &mut Gba) {
-    let channel = match PSG {
-        1 => PSGChannel::Sound1,
-        2 => PSGChannel::Sound2,
+    use PSGChannel::*;
+
+    match PSG {
+        1 => gba
+            .audio
+            .set_psg_square_freq_control(Sound1, &mut gba.mem.ioregs),
+        2 => gba
+            .audio
+            .set_psg_square_freq_control(Sound2, &mut gba.mem.ioregs),
+        3 => gba.audio.set_psg_wave_freq_control(&mut gba.mem.ioregs),
+        4 => gba.audio.set_psg_noise_freq_control(&mut gba.mem.ioregs),
         _ => unreachable!(),
-    };
-    gba.audio.set_psg_freq_control(channel, &mut gba.mem.ioregs);
+    }
 }
 
 pub fn resolution_changed(gba: &mut Gba) {
@@ -318,8 +406,10 @@ pub enum Command {
     SetResolution(Resolution),
     SetBias(u16),
 
+    SetNoiseFrequencyParams { r: u8, s: u8 },
+    SetNoiseCounterWidth(u16),
     SetPSGEnabled(PSGChannel, bool),
-    SetPSGFrequencyRate(PSGChannel, u16),
-    SetPSGDuty(PSGChannel, u16),
+    SetSquareFrequencyRate(PSGChannel, u16),
+    SetSquareDuty(PSGChannel, u16),
     SetPSGEnvelopeVolume(PSGChannel, u16),
 }

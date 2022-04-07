@@ -135,7 +135,7 @@ bitfields! {
         [0,5]   length, set_length: u16,
         [8,10]  envelope_step_time, set_envelope_step_time: u16,
         [11]    envelope_direction, set_envelope_direction: Direction,
-        [12,15] initial_volume, set_initial_volume: u16,
+        [12,15] initial_envelope_volume, set_initial_envelope_volume: u16,
 
         [0,15]  lo, set_lo: u16,
         [16,31] hi, set_hi: u16,
@@ -157,6 +157,11 @@ bitfields! {
     /// 15    W    Initial      (1=Restart Sound)
     /// 16-31 -    Not used
     pub struct NoiseFreqControl: u32 {
+        [0,2]   r, set_r: u16,
+        [3]     width, set_width: u16,
+        [4,7]   s, set_s: u16,
+        [14]    length_flag, set_length_flag: bool,
+        [15]    initial, set_initial: bool,
         [0,15]  lo, set_lo: u16,
         [16,31] hi, set_hi: u16,
     }

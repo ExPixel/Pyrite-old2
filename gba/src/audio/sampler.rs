@@ -18,6 +18,7 @@ pub struct GbaAudioSampler {
 
     sound1: SquareWave,
     sound2: SquareWave,
+    sound4: Noise,
 }
 
 impl GbaAudioSampler {
@@ -32,6 +33,7 @@ impl GbaAudioSampler {
 
             sound1: SquareWave::default(),
             sound2: SquareWave::default(),
+            sound4: Noise::default(),
         }
     }
 
@@ -50,7 +52,12 @@ impl GbaAudioSampler {
 
         // Each of the four PSGs can span one QUARTER of the output range (+/-80h).
         // FIXME implement PSG output
-        let psg = [self.sound1.frame(), self.sound2.frame(), 0, 0];
+        let psg = [
+            self.sound1.frame(),
+            self.sound2.frame(),
+            0,
+            self.sound4.frame(),
+        ];
         let mut psg_l = [0i16; 4];
         let mut psg_r = [0i16; 4];
 
@@ -111,10 +118,15 @@ impl GbaAudioSampler {
                 PSGChannel::Sound1 => self.sound1.enabled = enabled,
                 PSGChannel::Sound2 => self.sound2.enabled = enabled,
                 PSGChannel::Sound3 => log::debug!("SetPSGEnabled(3)"),
-                PSGChannel::Sound4 => log::debug!("SetPSGEnabled(4)"),
+                PSGChannel::Sound4 => {
+                    self.sound4.enabled = enabled;
+                    if enabled {
+                        self.sound4.reset();
+                    }
+                }
             },
 
-            Command::SetPSGFrequencyRate(chan, rate) => match chan {
+            Command::SetSquareFrequencyRate(chan, rate) => match chan {
                 PSGChannel::Sound1 => self
                     .sound1
                     .set_frequency_rate(rate as u32, self.native_frequency),
@@ -123,18 +135,23 @@ impl GbaAudioSampler {
                     .set_frequency_rate(rate as u32, self.native_frequency),
                 _ => unreachable!(),
             },
-
-            Command::SetPSGDuty(chan, duty) => match chan {
+            Command::SetSquareDuty(chan, duty) => match chan {
                 PSGChannel::Sound1 => self.sound1.set_duty(duty),
                 PSGChannel::Sound2 => self.sound2.set_duty(duty),
                 _ => unreachable!(),
             },
 
+            Command::SetNoiseCounterWidth(width) => self.sound4.set_width(width),
+            Command::SetNoiseFrequencyParams { r, s } => {
+                self.sound4
+                    .set_frequency_params(r as u32, s as u32, self.native_frequency);
+            }
+
             Command::SetPSGEnvelopeVolume(chan, volume) => match chan {
                 PSGChannel::Sound1 => self.sound1.set_volume(volume as i16),
                 PSGChannel::Sound2 => self.sound2.set_volume(volume as i16),
                 PSGChannel::Sound3 => log::debug!("SetPSGVolume(3)"),
-                PSGChannel::Sound4 => log::debug!("SetPSGVolume(4)"),
+                PSGChannel::Sound4 => self.sound4.set_volume(volume as i16),
             },
         }
     }
@@ -146,11 +163,9 @@ impl GbaAudioSampler {
 
 #[derive(Default)]
 struct SquareWave {
-    frequency_rate: u32,
-    native_frequency: u32,
-    phase: u32,
-    phase_inc: u32,
-    duty: u32,
+    phase: f32,
+    phase_inc: f32,
+    duty: f32,
     enabled: bool,
     volume: i16,
     output: i16,
@@ -160,9 +175,7 @@ impl SquareWave {
     fn set_frequency_rate(&mut self, rate: u32, native_frequency: u32) {
         debug_assert!(rate < 2048);
         let frequency = 131072 / (2048 - rate);
-        self.frequency_rate = rate;
-        self.native_frequency = native_frequency;
-        self.phase_inc = (u32::MAX / native_frequency) * frequency;
+        self.phase_inc = frequency as f32 / native_frequency as f32;
     }
 
     fn set_volume(&mut self, volume: i16) {
@@ -177,23 +190,100 @@ impl SquareWave {
     /// 3: 75%   ( ------__------__------__ )  
     fn set_duty(&mut self, duty: u16) {
         self.duty = match duty {
-            0 => 0x1fffffff,
-            1 => 0x3fffffff,
-            2 => 0x7fffffff,
-            3 => 0xbfffffff,
+            0 => 0.125,
+            1 => 0.25,
+            2 => 0.50,
+            3 => 0.75,
             _ => unreachable!("invalid wave duty"),
         };
     }
 
-    /// Returns `volume` if the square wave is high for this frame, or 0 if the
-    /// square wave is currently low.
     fn frame(&mut self) -> i16 {
         let output = if self.enabled && self.phase <= self.duty {
             self.output
         } else {
             0
         };
-        self.phase = self.phase.wrapping_add(self.phase_inc);
+        self.phase = (self.phase + self.phase_inc) % 1.0;
         output
+    }
+}
+
+#[derive(Default)]
+pub struct Noise {
+    lfsr: u16,
+    width: u16,
+    lfsr_xor: u16,
+    count: f32,
+    count_inc: f32,
+    enabled: bool,
+    volume: i16,
+    output: i16,
+}
+
+impl Noise {
+    fn set_frequency_params(&mut self, r: u32, s: u32, native_frequency: u32) {
+        // Frequency = 524288 Hz / r / 2^(s+1) ;For r=0 assume r=0.5 instead
+        let frequency = if r != 0 {
+            (524288 / r) >> (1 + s)
+        } else {
+            (524288 * 2) >> (1 + s)
+        } as f32;
+        self.count_inc = frequency / native_frequency as f32;
+    }
+
+    fn set_volume(&mut self, volume: i16) {
+        self.volume = volume;
+        self.output = (0x80 * volume) / 15;
+    }
+
+    fn set_width(&mut self, width: u16) {
+        self.width = width;
+        if width == 0 {
+            // 15 bits
+            self.lfsr &= 0x7FFF;
+            self.lfsr_xor = 0x6000;
+        } else if width == 1 {
+            // 7 bits
+            self.lfsr &= 0x7F;
+            self.lfsr_xor = 0x60;
+        }
+    }
+
+    fn reset(&mut self) {
+        // The initial value when (re-)starting the sound is X=40h (7bit) or X=4000h (15bit). The data stream repeats after 7Fh (7bit) or 7FFFh (15bit) steps.
+        if self.width == 0 {
+            // 15 bits
+            self.lfsr = 0x4000;
+        } else {
+            // 7 bits
+            self.lfsr = 0x40;
+        }
+    }
+
+    fn frame(&mut self) -> i16 {
+        // Noise Random Generator (aka Polynomial Counter)
+        // Noise randomly switches between HIGH and LOW levels, the output levels are calculated by a shift register (X), at the selected frequency, as such:
+        //   7bit:  X=X SHR 1, IF carry THEN Out=HIGH, X=X XOR 60h ELSE Out=LOW
+        //   15bit: X=X SHR 1, IF carry THEN Out=HIGH, X=X XOR 6000h ELSE Out=LOW
+        // The initial value when (re-)starting the sound is X=40h (7bit) or X=4000h (15bit). The data stream repeats after 7Fh (7bit) or 7FFFh (15bit) steps.
+
+        let mut high = (self.lfsr & 1) != 0;
+
+        self.count += self.count_inc;
+        while self.count >= 1.0 {
+            self.lfsr >>= 1;
+            if high {
+                self.lfsr ^= self.lfsr_xor;
+            }
+            high = (self.lfsr & 1) != 0;
+            self.count -= 1.0;
+        }
+
+        if self.enabled && high {
+            self.output
+        } else {
+            0
+        }
     }
 }

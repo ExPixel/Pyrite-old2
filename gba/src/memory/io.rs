@@ -223,13 +223,29 @@ impl GbaMemory {
                     .schedule(audio::psg_freq_control_changed::<2>, 0, EventTag::None);
             }
             SOUND2CNT_H_H => self.ioregs.sound2cnt_h.set_hi(value),
-            SOUND3CNT_L => self.ioregs.sound3cnt_l.set_preserve_bits(value),
+            SOUND3CNT_L => {
+                self.ioregs.sound3cnt_l.set_preserve_bits(value);
+                self.scheduler
+                    .schedule(audio::psg_wave_len_env_changed, 0, EventTag::None);
+            }
             SOUND3CNT_H => self.ioregs.sound3cnt_h.set_preserve_bits(value),
-            SOUND3CNT_X => self.ioregs.sound3cnt_x.set_lo(value),
+            SOUND3CNT_X => {
+                self.ioregs.sound3cnt_x.set_lo(value);
+                self.scheduler
+                    .schedule(audio::psg_freq_control_changed::<3>, 0, EventTag::None);
+            }
             SOUND3CNT_X_H => self.ioregs.sound3cnt_x.set_hi(value),
-            SOUND4CNT_L => self.ioregs.sound4cnt_l.set_lo(value),
+            SOUND4CNT_L => {
+                self.ioregs.sound4cnt_l.set_lo(value);
+                self.scheduler
+                    .schedule(audio::psg_nosie_len_env_changed, 0, EventTag::None);
+            }
             SOUND4CNT_L_H => self.ioregs.sound4cnt_l.set_hi(value),
-            SOUND4CNT_H => self.ioregs.sound4cnt_h.set_lo(value),
+            SOUND4CNT_H => {
+                self.ioregs.sound4cnt_h.set_lo(value);
+                self.scheduler
+                    .schedule(audio::psg_freq_control_changed::<4>, 0, EventTag::None);
+            }
             SOUND4CNT_H_H => self.ioregs.sound4cnt_h.set_hi(value),
             SOUNDCNT_L => self.ioregs.soundcnt_l.set_preserve_bits(value),
             SOUNDCNT_H => self.ioregs.soundcnt_h.set_preserve_bits(value),

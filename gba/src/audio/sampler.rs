@@ -99,13 +99,8 @@ impl GbaAudioSampler {
         match command {
             Command::Wait(cycles) if cycles != 0 => self.wait_cycles(cycles),
             Command::Wait(_) => { /* 0 cycles = NOP */ }
-            Command::PlaySample { channel, sample } => {
-                if channel == FifoChannel::A {
-                    self.fifo_a = sample;
-                } else {
-                    self.fifo_b = sample;
-                }
-            }
+            Command::PlaySampleFifoA(sample) => self.fifo_a = sample,
+            Command::PlaySampleFifoB(sample) => self.fifo_b = sample,
             Command::SetBias(bias) => self.bias = bias as i16,
             Command::SetResolution(resolution) => {
                 // FIXME: Frequency is currently ignored. Should it continue to be this way?

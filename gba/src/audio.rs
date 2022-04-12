@@ -308,12 +308,13 @@ impl GbaAudio {
 
     fn fifo_play(&mut self, channel: FifoChannel, ioregs: &mut IoRegisters) {
         self.wait(ioregs.time);
-        let sample = if channel == FifoChannel::A {
-            ioregs.fifo_a.pop_sample()
+        if channel == FifoChannel::A {
+            self.commands
+                .push(Command::PlaySampleFifoA(ioregs.fifo_a.pop_sample() as i8))
         } else {
-            ioregs.fifo_b.pop_sample()
-        } as i8;
-        self.commands.push(Command::PlaySample { channel, sample });
+            self.commands
+                .push(Command::PlaySampleFifoB(ioregs.fifo_b.pop_sample() as i8))
+        }
     }
 
     fn wait(&mut self, now: u64) {
@@ -402,7 +403,8 @@ pub fn check_fifo_timer_overflow(timer: usize, gba: &mut Gba) {
 #[derive(Clone, Copy, Debug)]
 pub enum Command {
     Wait(u32),
-    PlaySample { channel: FifoChannel, sample: i8 },
+    PlaySampleFifoA(i8),
+    PlaySampleFifoB(i8),
     SetResolution(Resolution),
     SetBias(u16),
 

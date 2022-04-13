@@ -123,7 +123,7 @@ impl AudioPane {
         let chart = BarChart::new(bars).name("Command Buffer Size Chart");
         Plot::new("Command Buffer Sizes")
             .allow_drag(false)
-            .allow_zoom(false)
+            .allow_zoom(true)
             .show(ui, |plot_ui| {
                 plot_ui.bar_chart(chart);
             });

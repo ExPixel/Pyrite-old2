@@ -1,4 +1,4 @@
-use crate::memory::io::{FifoChannel, PSGChannel};
+use crate::memory::io::PSGChannel;
 
 use super::Command;
 
@@ -18,6 +18,7 @@ pub struct GbaAudioSampler {
 
     sound1: SquareWave,
     sound2: SquareWave,
+    sound3: WaveSample,
     sound4: Noise,
 }
 
@@ -33,6 +34,7 @@ impl GbaAudioSampler {
 
             sound1: SquareWave::default(),
             sound2: SquareWave::default(),
+            sound3: WaveSample::default(),
             sound4: Noise::default(),
         }
     }
@@ -55,7 +57,7 @@ impl GbaAudioSampler {
         let psg = [
             self.sound1.frame(),
             self.sound2.frame(),
-            0,
+            self.sound3.frame(),
             self.sound4.frame(),
         ];
         let mut psg_l = [0i16; 4];
@@ -101,6 +103,7 @@ impl GbaAudioSampler {
             Command::Wait(_) => { /* 0 cycles = NOP */ }
             Command::PlaySampleFifoA(sample) => self.fifo_a = sample,
             Command::PlaySampleFifoB(sample) => self.fifo_b = sample,
+            Command::PlaySampleWave(sample) => self.sound3.sample = sample,
             Command::SetBias(bias) => self.bias = bias as i16,
             Command::SetResolution(resolution) => {
                 // FIXME: Frequency is currently ignored. Should it continue to be this way?
@@ -112,7 +115,7 @@ impl GbaAudioSampler {
             Command::SetPSGEnabled(chan, enabled) => match chan {
                 PSGChannel::Sound1 => self.sound1.enabled = enabled,
                 PSGChannel::Sound2 => self.sound2.enabled = enabled,
-                PSGChannel::Sound3 => log::debug!("SetPSGEnabled(3)"),
+                PSGChannel::Sound3 => self.sound3.enabled = enabled,
                 PSGChannel::Sound4 => {
                     self.sound4.enabled = enabled;
                     if enabled {
@@ -201,6 +204,22 @@ impl SquareWave {
         };
         self.phase = (self.phase + self.phase_inc) % 1.0;
         output
+    }
+}
+
+#[derive(Default)]
+pub struct WaveSample {
+    enabled: bool,
+    sample: i16,
+}
+
+impl WaveSample {
+    fn frame(&self) -> i16 {
+        if self.enabled {
+            self.sample
+        } else {
+            0
+        }
     }
 }
 

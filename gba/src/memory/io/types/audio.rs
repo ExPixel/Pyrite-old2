@@ -110,15 +110,67 @@ fn swap_nibbles16(n: u16) -> u16 {
 }
 
 #[derive(Copy, Clone, Default)]
-pub struct WaveRam(u128);
+pub struct WaveRam(pub u128, u128);
 
 impl WaveRam {
-    pub fn store16(&mut self, index: u32, value: u16) {
-        self.0 |= (swap_nibbles16(value) as u128) << (index * 16);
+    pub fn shift(&mut self, count: u32, bank: u16) {
+        if bank == 0 {
+            self.0 = self.0.rotate_right(count * 4)
+        } else {
+            self.1 = self.1.rotate_right(count * 4)
+        }
     }
 
-    pub fn load16(&mut self, index: u32) -> u16 {
-        swap_nibbles16((self.0 >> (index * 16)) as u16)
+    pub fn wide_shift(&mut self, count: u32) {
+        self.rotate_right256(count * 4)
+    }
+
+    /// Shift this as if it's one large 256bit register.
+    fn rotate_right256(&mut self, rhs: u32) {
+        let rhs = rhs & 0xFF;
+        let (lo, hi, rhs) = if rhs >= 128 {
+            (self.1, self.0, rhs - 128)
+        } else {
+            (self.0, self.1, rhs)
+        };
+
+        // bits shifted from the low bits of `lo` into the high bits of `hi`.
+        let lo_into_hi = lo.checked_shl(128 - rhs).unwrap_or(0);
+        // bits shifted from the low bits of `hi` into the high bits of `lo`.
+        let hi_into_lo = hi.checked_shl(128 - rhs).unwrap_or(0);
+
+        self.0 = (lo >> rhs) | hi_into_lo;
+        self.1 = (hi >> rhs) | lo_into_hi;
+    }
+
+    pub fn read_sample(&mut self, bank: u16) -> u8 {
+        if bank == 0 {
+            (self.0 & 0xF) as u8
+        } else {
+            (self.1 & 0xF) as u8
+        }
+    }
+
+    pub fn store16(&mut self, index: u32, value: u16, bank: u16) {
+        let shift = index * 16;
+        let mask = !(0xFFFFu128 << shift);
+        let value = swap_nibbles16(value) as u128;
+
+        if bank == 0 {
+            self.0 &= mask;
+            self.0 |= value << shift;
+        } else {
+            self.1 &= mask;
+            self.1 |= value << shift;
+        }
+    }
+
+    pub fn load16(&self, index: u32, bank: u16) -> u16 {
+        if bank == 0 {
+            swap_nibbles16((self.0 >> (index * 16)) as u16)
+        } else {
+            swap_nibbles16((self.1 >> (index * 16)) as u16)
+        }
     }
 }
 
@@ -369,7 +421,7 @@ primitive_enum! {
 
 primitive_enum! {
     pub enum Dimension: u16 {
-        OneBank,
-        TwoBanks,
+        Single,
+        Dual,
     }
 }

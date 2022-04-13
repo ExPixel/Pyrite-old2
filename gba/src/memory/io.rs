@@ -68,14 +68,14 @@ impl GbaMemory {
             SOUNDCNT_X_H => self.ioregs.soundcnt_x.hi(),
             SOUNDBIAS => self.ioregs.soundbias.lo(),
             SOUNDBIAS_H => self.ioregs.soundbias.hi(),
-            WAVE_RAM0_L => self.ioregs.waveram.load16(0),
-            WAVE_RAM0_H => self.ioregs.waveram.load16(1),
-            WAVE_RAM1_L => self.ioregs.waveram.load16(2),
-            WAVE_RAM1_H => self.ioregs.waveram.load16(3),
-            WAVE_RAM2_L => self.ioregs.waveram.load16(4),
-            WAVE_RAM2_H => self.ioregs.waveram.load16(5),
-            WAVE_RAM3_L => self.ioregs.waveram.load16(6),
-            WAVE_RAM3_H => self.ioregs.waveram.load16(7),
+            WAVE_RAM0_L => self.waveram_load16(0),
+            WAVE_RAM0_H => self.waveram_load16(1),
+            WAVE_RAM1_L => self.waveram_load16(2),
+            WAVE_RAM1_H => self.waveram_load16(3),
+            WAVE_RAM2_L => self.waveram_load16(4),
+            WAVE_RAM2_H => self.waveram_load16(5),
+            WAVE_RAM3_L => self.waveram_load16(6),
+            WAVE_RAM3_H => self.waveram_load16(7),
             FIFO_A_L => 0xDEAD,
             FIFO_A_H => 0xDEAD,
             FIFO_B_L => 0xDEAD,
@@ -225,8 +225,12 @@ impl GbaMemory {
             SOUND2CNT_H_H => self.ioregs.sound2cnt_h.set_hi(value),
             SOUND3CNT_L => {
                 self.ioregs.sound3cnt_l.set_preserve_bits(value);
-                self.scheduler
-                    .schedule(audio::psg_wave_len_env_changed, 0, EventTag::None);
+                if !self.ioregs.sound3cnt_l.playback()
+                    && self.ioregs.soundcnt_x.sound_on(PSGChannel::Sound3)
+                {
+                    self.scheduler
+                        .schedule(audio::wave_stop_playback, 0, EventTag::None);
+                }
             }
             SOUND3CNT_H => self.ioregs.sound3cnt_h.set_preserve_bits(value),
             SOUND3CNT_X => {
@@ -235,11 +239,7 @@ impl GbaMemory {
                     .schedule(audio::psg_freq_control_changed::<3>, 0, EventTag::None);
             }
             SOUND3CNT_X_H => self.ioregs.sound3cnt_x.set_hi(value),
-            SOUND4CNT_L => {
-                self.ioregs.sound4cnt_l.set_lo(value);
-                self.scheduler
-                    .schedule(audio::psg_nosie_len_env_changed, 0, EventTag::None);
-            }
+            SOUND4CNT_L => self.ioregs.sound4cnt_l.set_lo(value),
             SOUND4CNT_L_H => self.ioregs.sound4cnt_l.set_hi(value),
             SOUND4CNT_H => {
                 self.ioregs.sound4cnt_h.set_lo(value);
@@ -264,14 +264,14 @@ impl GbaMemory {
                 }
             }
             SOUNDBIAS_H => self.ioregs.soundbias.set_hi(value),
-            WAVE_RAM0_L => self.ioregs.waveram.store16(0, value),
-            WAVE_RAM0_H => self.ioregs.waveram.store16(1, value),
-            WAVE_RAM1_L => self.ioregs.waveram.store16(2, value),
-            WAVE_RAM1_H => self.ioregs.waveram.store16(3, value),
-            WAVE_RAM2_L => self.ioregs.waveram.store16(4, value),
-            WAVE_RAM2_H => self.ioregs.waveram.store16(5, value),
-            WAVE_RAM3_L => self.ioregs.waveram.store16(6, value),
-            WAVE_RAM3_H => self.ioregs.waveram.store16(7, value),
+            WAVE_RAM0_L => self.waveram_store16(0, value),
+            WAVE_RAM0_H => self.waveram_store16(1, value),
+            WAVE_RAM1_L => self.waveram_store16(2, value),
+            WAVE_RAM1_H => self.waveram_store16(3, value),
+            WAVE_RAM2_L => self.waveram_store16(4, value),
+            WAVE_RAM2_H => self.waveram_store16(5, value),
+            WAVE_RAM3_L => self.waveram_store16(6, value),
+            WAVE_RAM3_H => self.waveram_store16(7, value),
             FIFO_A_L => self.ioregs.fifo_a.store16(value),
             FIFO_A_H => self.ioregs.fifo_a.store16(value),
             FIFO_B_L => self.ioregs.fifo_b.store16(value),
@@ -364,6 +364,23 @@ impl GbaMemory {
                 self.store16_io(address, value16)
             }
         }
+    }
+
+    fn waveram_load16(&self, index: u32) -> u16 {
+        let bank = !self.ioregs.sound3cnt_l.bank_number() & 0x1;
+        self.ioregs.waveram.load16(index, bank)
+    }
+
+    fn waveram_store16(&mut self, index: u32, value: u16) {
+        // Cannot write to waveram while it is playing and in dual bank mode.
+        if self.ioregs.sound3cnt_l.dimension() == Dimension::Dual
+            && self.ioregs.soundcnt_x.sound_on(PSGChannel::Sound3)
+        {
+            return;
+        }
+
+        let bank = !self.ioregs.sound3cnt_l.bank_number() & 0x1;
+        self.ioregs.waveram.store16(index, value, bank)
     }
 
     fn write_to_haltcnt(&mut self, value: u8) {

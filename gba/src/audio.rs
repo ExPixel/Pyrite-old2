@@ -2,7 +2,7 @@ pub mod sampler;
 
 use crate::{
     dma,
-    memory::io::{Direction, FifoChannel, IoRegisters, PSGChannel, Resolution, Timing},
+    memory::io::{Dimension, Direction, FifoChannel, IoRegisters, PSGChannel, Resolution, Timing},
     scheduler::{EventTag, Scheduler},
     Gba,
 };
@@ -13,6 +13,11 @@ pub struct GbaAudio {
     commands: Vec<Command>,
     last_update_time: u64,
     psg_envelope_volumes: [u16; 4],
+
+    /// Maximum frequency at which we will sample waveram.
+    min_wave_cycles: u32,
+    last_wave_sample_time: u64,
+    last_wave_freq_rate: u16,
 }
 
 impl GbaAudio {
@@ -22,6 +27,10 @@ impl GbaAudio {
             commands: Vec::with_capacity(1024),
             last_update_time: 0,
             psg_envelope_volumes: [0; 4],
+
+            min_wave_cycles: 512, // maximum sample rate of 32768 by default
+            last_wave_sample_time: 0,
+            last_wave_freq_rate: 0,
         }
     }
 
@@ -34,7 +43,35 @@ impl GbaAudio {
         &self.commands
     }
 
-    fn stop_psg(&mut self, chan: PSGChannel, ioregs: &mut IoRegisters) {
+    fn sample_waveram(&mut self, ioregs: &mut IoRegisters) {
+        let cycles_per_sample = Self::wave_cycles_per_sample(ioregs);
+        let samples =
+            ((ioregs.time - self.last_wave_sample_time) / cycles_per_sample as u64) as u32;
+
+        let bank;
+        if ioregs.sound3cnt_l.dimension() == Dimension::Single {
+            bank = ioregs.sound3cnt_l.bank_number();
+            ioregs.waveram.shift(samples, bank);
+        } else {
+            bank = 0;
+            ioregs.waveram.wide_shift(samples);
+        }
+
+        let sample = (ioregs.waveram.read_sample(bank) as i16) << 4;
+        self.wait(ioregs.time);
+        self.commands.push(Command::PlaySampleWave(sample));
+        self.last_wave_sample_time = ioregs.time;
+
+        let next_cycles = self.wave_cycles_per_sample_capped(ioregs);
+        self.scheduler
+            .schedule(wave_resample, next_cycles, EventTag::SamplePSG3);
+    }
+
+    pub fn stop_psg(&mut self, chan: PSGChannel, ioregs: &mut IoRegisters) {
+        if !ioregs.soundcnt_x.sound_on(chan) {
+            return;
+        }
+
         self.unschedule_psg_events(chan);
         ioregs.soundcnt_x.set_sound_on(chan, false);
         self.wait(ioregs.time);
@@ -42,7 +79,17 @@ impl GbaAudio {
     }
 
     fn psg_length_end(&mut self, chan: PSGChannel, ioregs: &mut IoRegisters) {
-        self.stop_psg(chan, ioregs);
+        use PSGChannel::*;
+        let should_expire = match chan {
+            Sound1 => ioregs.sound1cnt_x.length_flag(),
+            Sound2 => ioregs.sound2cnt_h.length_flag(),
+            Sound3 => ioregs.sound3cnt_x.length_flag(),
+            Sound4 => ioregs.sound4cnt_h.length_flag(),
+        };
+
+        if should_expire {
+            self.stop_psg(chan, ioregs);
+        }
     }
 
     fn psg_envelope_step(&mut self, chan: PSGChannel, ioregs: &IoRegisters) {
@@ -102,18 +149,6 @@ impl GbaAudio {
         // FIXME reimplement this
     }
 
-    fn set_psg_noise_len_env(&mut self, _ioregs: &mut IoRegisters) {
-        // FIXME for now this is a NOP but eventually length
-        // should work like envelopes/sweeps and increment the sound
-        // length in the register every 1/256s.
-    }
-
-    fn set_psg_wave_len(&mut self, _ioregs: &mut IoRegisters) {
-        // FIXME for now this is a NOP but eventually length
-        // should work like envelopes/sweeps and increment the sound
-        // length in the register every 1/256s.
-    }
-
     fn set_psg_square_duty_len_env(&mut self, chan: PSGChannel, ioregs: &IoRegisters) {
         if !ioregs.soundcnt_x.master_enable() {
             return;
@@ -137,16 +172,25 @@ impl GbaAudio {
         } else {
             Some(EventTag::psg_envelope_tick(chan))
         };
+
         let tag_sweep_tick = if chan == Sound1 {
             Some(EventTag::SweepTickPSG1)
         } else {
             None
         };
+
+        let tag_sample_wave = if chan == Sound3 {
+            Some(EventTag::SamplePSG3)
+        } else {
+            None
+        };
+
         let tag_length_end = EventTag::psg_length_end(chan);
         self.scheduler.unschedule_matching(|event| {
             event.tag == tag_length_end
                 || Some(event.tag) == tag_envelope_tick
                 || Some(event.tag) == tag_sweep_tick
+                || Some(event.tag) == tag_sample_wave
         });
     }
 
@@ -246,10 +290,38 @@ impl GbaAudio {
     }
 
     fn set_psg_wave_freq_control(&mut self, ioregs: &mut IoRegisters) {
+        use PSGChannel::*;
+
         if !ioregs.soundcnt_x.master_enable() {
             return;
         }
-        log::debug!("set_psg_wave_freq_control");
+
+        if ioregs.sound3cnt_x.initial() && ioregs.sound3cnt_l.playback() {
+            self.wait(ioregs.time);
+            self.commands.push(Command::SetPSGEnabled(Sound3, true));
+            ioregs.soundcnt_x.set_sound_on(Sound3, true);
+            ioregs.sound3cnt_x.set_initial(false);
+            self.unschedule_psg_events(Sound3);
+            self.last_wave_sample_time = ioregs.time;
+            self.last_wave_freq_rate = ioregs.sound3cnt_x.freq_setting();
+            self.scheduler
+                .schedule(wave_resample, 0, EventTag::SamplePSG3);
+
+            if ioregs.sound3cnt_x.length_flag() {
+                self.schedule_psg_length_end(Sound3, ioregs);
+            }
+
+            return;
+        }
+
+        if ioregs.soundcnt_x.sound_on(Sound3)
+            && ioregs.sound3cnt_x.freq_setting() != self.last_wave_freq_rate
+        {
+            self.last_wave_freq_rate = ioregs.sound3cnt_x.freq_setting();
+            let cycles = self.wave_cycles_per_sample_capped(ioregs);
+            self.scheduler
+                .reschedule_ealier(wave_resample, cycles, EventTag::SamplePSG3);
+        }
     }
 
     fn set_psg_square_freq_control(&mut self, chan: PSGChannel, ioregs: &mut IoRegisters) {
@@ -328,18 +400,34 @@ impl GbaAudio {
         }
         self.last_update_time = now;
     }
+
+    fn wave_cycles_per_sample_capped(&self, ioregs: &IoRegisters) -> u32 {
+        Self::wave_cycles_per_sample(ioregs).max(self.min_wave_cycles)
+    }
+
+    fn wave_cycles_per_sample(ioregs: &IoRegisters) -> u32 {
+        // C = G / (2097152 / F)
+        // where:
+        //   C = Output Cycles
+        //   G = GBA Cycles Per Second
+        //   F = 2048 - f
+        //   f = frequency setting
+        //
+        // Reduced to this:
+        8 * (2048 - ioregs.sound3cnt_x.freq_setting() as u32)
+    }
+}
+
+fn wave_resample(gba: &mut Gba) {
+    gba.audio.sample_waveram(&mut gba.mem.ioregs);
+}
+
+pub fn wave_stop_playback(gba: &mut Gba) {
+    gba.audio.stop_psg(PSGChannel::Sound3, &mut gba.mem.ioregs);
 }
 
 pub fn psg_sweep_changed(gba: &mut Gba) {
     gba.audio.set_psg_sweep_control(&gba.mem.ioregs);
-}
-
-pub fn psg_nosie_len_env_changed(gba: &mut Gba) {
-    gba.audio.set_psg_noise_len_env(&mut gba.mem.ioregs);
-}
-
-pub fn psg_wave_len_env_changed(gba: &mut Gba) {
-    gba.audio.set_psg_wave_len(&mut gba.mem.ioregs);
 }
 
 pub fn psg_duty_len_env_changed<const PSG: u32>(gba: &mut Gba) {
@@ -405,6 +493,7 @@ pub enum Command {
     Wait(u32),
     PlaySampleFifoA(i8),
     PlaySampleFifoB(i8),
+    PlaySampleWave(i16),
     SetResolution(Resolution),
     SetBias(u16),
 

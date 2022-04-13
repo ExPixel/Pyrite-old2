@@ -39,6 +39,7 @@ pub enum EventTag {
     EnvelopeTickPSG2,
     EnvelopeTickPSG4,
     SweepTickPSG1,
+    SamplePSG3,
 }
 
 impl EventTag {
@@ -93,6 +94,12 @@ impl Scheduler {
         self.inner
             .borrow_mut()
             .schedule(cycles.into(), callback, tag);
+    }
+
+    pub fn contains_tag(&self, tag: EventTag) -> bool {
+        self.inner
+            .borrow()
+            .contains_matching(|event| event.tag == tag)
     }
 
     pub fn reschedule(&self, callback: EventFn, cycles: impl Into<Cycles>, tag: EventTag) {
@@ -177,26 +184,34 @@ impl Inner {
 
     fn reschedule_ealier(&mut self, cycles: arm::Cycles, cb: EventFn, tag: EventTag) {
         let when = self.time + u32::from(cycles) as u64;
-        let removed = self.unschedule_matching(|event| event.tag == tag && event.when > when);
-        if removed > 0 {
+
+        let mut found_matching_tag = false;
+        let mut unscheduled_matching = false;
+        self.unschedule_matching(|event| {
+            let matching_tag = event.tag == tag;
+            let remove = matching_tag && event.when > when;
+            found_matching_tag |= matching_tag;
+            unscheduled_matching |= remove;
+            remove
+        });
+
+        if unscheduled_matching || !found_matching_tag {
             self.schedule(cycles, cb, tag);
         }
     }
 
-    fn unschedule_matching<F>(&mut self, mut predicate: F) -> usize
+    fn contains_matching<F>(&self, predicate: F) -> bool
     where
         F: FnMut(&Event) -> bool,
     {
-        let mut removed = 0;
-        self.events.retain(|event| {
-            if predicate(event) {
-                removed += 1;
-                false
-            } else {
-                true
-            }
-        });
-        removed
+        self.events.iter().any(predicate)
+    }
+
+    fn unschedule_matching<F>(&mut self, mut predicate: F)
+    where
+        F: FnMut(&Event) -> bool,
+    {
+        self.events.retain(|event| !predicate(event));
     }
 
     fn unschedule(&mut self, tag: EventTag) {

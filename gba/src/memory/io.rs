@@ -357,11 +357,11 @@ impl GbaMemory {
             FIFO_B_H_H => self.ioregs.fifo_b.store8(value),
 
             _ => {
-                let mut value16 = self.load16_io::<false>(address);
+                let mut value16 = self.load16_io::<false>(address & !0x1);
                 let shift = (address & 1) * 8;
                 value16 &= !0xFF << shift;
                 value16 |= (value as u16) << shift;
-                self.store16_io(address, value16)
+                self.store16_io(address & !0x1, value16)
             }
         }
     }

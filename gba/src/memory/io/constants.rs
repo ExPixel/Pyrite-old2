@@ -166,7 +166,9 @@ pub const RCNT: u32 = 0x04000134;
 pub const IR: u32 = 0x04000136;
 pub const JOYCNT: u32 = 0x04000140;
 pub const JOY_RECV: u32 = 0x04000150;
+pub const JOY_RECV_H: u32 = 0x04000152;
 pub const JOY_TRANS: u32 = 0x04000154;
+pub const JOY_TRANS_H: u32 = 0x04000156;
 pub const JOYSTAT: u32 = 0x04000158;
 
 // Interrupt, Waitstate, and Power-Down Control

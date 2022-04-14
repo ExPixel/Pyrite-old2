@@ -23,6 +23,20 @@ impl GbaMemory {
     }
 
     pub(super) fn load16_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u16 {
+        macro_rules! unimplemented_register {
+            ($name:expr) => {{
+                static mut ATTEMPTED_READ: bool = false;
+                if unsafe { !ATTEMPTED_READ } {
+                    log::warn!(
+                        "attempted to read unimplemented {} register; address=0x{address:08X}",
+                        $name
+                    );
+                    unsafe { ATTEMPTED_READ = true };
+                }
+                0
+            }};
+        }
+
         match address {
             // LCD
             DISPCNT => self.ioregs.dispcnt.into(),
@@ -117,8 +131,26 @@ impl GbaMemory {
             TM3CNT_L => self.read_timer_counter(3),
             TM3CNT_H => self.ioregs.timers[3].control.into(),
 
+            // Serial Communications (1)
+            SIOMULTI0 => unimplemented_register!("SIODATA32/SIOMULTI0"),
+            SIOMULTI1 => unimplemented_register!("SIODATA32/SIOMULTI1"),
+            SIOMULTI2 => unimplemented_register!("SIOMULTI2"),
+            SIOMULTI3 => unimplemented_register!("SIOMULTI3"),
+            SIOCNT => unimplemented_register!("SIOCNT"),
+            SIOMLT_SEND => unimplemented_register!("SIOMLT_SEND/SIODATA8"),
+
             // Keypad Input
             KEYINPUT => self.ioregs.keyinput,
+
+            // Serial Communications (2)
+            RCNT => unimplemented_register!("RCNT"),
+            IR => unimplemented_register!("IR"),
+            JOYCNT => unimplemented_register!("JOYCNT"),
+            JOY_RECV => unimplemented_register!("JOY_RECV"),
+            JOY_RECV_H => unimplemented_register!("JOY_RECV_H"),
+            JOY_TRANS => unimplemented_register!("JOY_TRANS"),
+            JOY_TRANS_H => unimplemented_register!("JOY_TRANS_H"),
+            JOYSTAT => unimplemented_register!("JOYSTAT"),
 
             // Interrupt, Waitstate, and Power-Down Control
             IE => self.ioregs.ie_reg.into(),
@@ -148,6 +180,16 @@ impl GbaMemory {
     }
 
     pub(super) fn store16_io(&mut self, address: u32, value: u16) {
+        macro_rules! unimplemented_register {
+            ($name:expr) => {{
+                static mut LAST_WRITTEN_VALUE: Option<u16> = None;
+                if unsafe { LAST_WRITTEN_VALUE != Some(value) } {
+                    log::warn!("attempted to write to unimplemented {} register; address=0x{address:08X}; value=0x{value:04X}", $name);
+                    unsafe { LAST_WRITTEN_VALUE = Some(value) };
+                }
+            }};
+        }
+
         match address {
             // LCD
             DISPCNT => self.ioregs.dispcnt.set_preserve_bits(value),
@@ -313,8 +355,26 @@ impl GbaMemory {
             TM3CNT_L => self.write_to_timer_reload(3, value),
             TM3CNT_H => self.write_to_timer_cotrol(3, value),
 
+            // Serial Communications (1)
+            SIOMULTI0 => unimplemented_register!("SIODATA32/SIOMULTI0"),
+            SIOMULTI1 => unimplemented_register!("SIODATA32/SIOMULTI1"),
+            SIOMULTI2 => unimplemented_register!("SIOMULTI2"),
+            SIOMULTI3 => unimplemented_register!("SIOMULTI3"),
+            SIOCNT => unimplemented_register!("SIOCNT"),
+            SIOMLT_SEND => unimplemented_register!("SIOMLT_SEND/SIODATA8"),
+
             // Keypad Input
             KEYINPUT => { /*NOP */ }
+
+            // Serial Communications (2)
+            RCNT => unimplemented_register!("RCNT"),
+            IR => unimplemented_register!("IR"),
+            JOYCNT => unimplemented_register!("JOYCNT"),
+            JOY_RECV => unimplemented_register!("JOY_RECV"),
+            JOY_RECV_H => unimplemented_register!("JOY_RECV_H"),
+            JOY_TRANS => unimplemented_register!("JOY_TRANS"),
+            JOY_TRANS_H => unimplemented_register!("JOY_TRANS_H"),
+            JOYSTAT => unimplemented_register!("JOYSTAT"),
 
             // Interrupt, Waitstate, and Power-Down Control
             IE => self.ioregs.ie_reg.set_preserve_bits(value),
@@ -331,11 +391,11 @@ impl GbaMemory {
             }
 
             _ => {
-                log::warn!(
-                    "attempted to write 0x{:04X} to unused IO address 0x{:08X}",
-                    value,
-                    address
-                );
+                // log::warn!(
+                //     "attempted to write 0x{:04X} to unused IO address 0x{:08X}",
+                //     value,
+                //     address
+                // );
             }
         }
     }

@@ -132,13 +132,7 @@ impl GbaMemory {
             REGION_UNUSED_1 => 0,
             REGION_EWRAM => self.ewram[(address & EWRAM_MASK) as usize],
             REGION_IWRAM => self.iwram[(address & IWRAM_MASK) as usize],
-            REGION_IOREGS => {
-                if address < IOREGS_SIZE {
-                    self.load8_io::<true>(address)
-                } else {
-                    0
-                }
-            }
+            REGION_IOREGS => self.load8_io::<true>(address),
             REGION_PAL => self.palette.view8(address),
             REGION_VRAM => self.vram[vram_offset(address)],
             REGION_OAM => self.oam[(address & OAM_MASK) as usize],
@@ -170,13 +164,7 @@ impl GbaMemory {
             REGION_UNUSED_1 => 0,
             REGION_EWRAM => read_u16(&*self.ewram, (address & EWRAM_MASK) as usize),
             REGION_IWRAM => read_u16(&*self.iwram, (address & IWRAM_MASK) as usize),
-            REGION_IOREGS => {
-                if address < IOREGS_SIZE {
-                    self.load16_io::<true>(address)
-                } else {
-                    0
-                }
-            }
+            REGION_IOREGS => self.load16_io::<true>(address),
             REGION_PAL => self.palette.view16(address),
             REGION_VRAM => read_u16(&*self.vram, vram_offset(address)),
             REGION_OAM => read_u16(&*self.oam, (address & OAM_MASK) as usize),
@@ -208,13 +196,7 @@ impl GbaMemory {
             REGION_UNUSED_1 => 0,
             REGION_EWRAM => read_u32(&*self.ewram, (address & EWRAM_MASK) as usize),
             REGION_IWRAM => read_u32(&*self.iwram, (address & IWRAM_MASK) as usize),
-            REGION_IOREGS => {
-                if address < IOREGS_SIZE {
-                    self.load32_io::<true>(address)
-                } else {
-                    0
-                }
-            }
+            REGION_IOREGS => self.load32_io::<true>(address),
             REGION_PAL => self.palette.view32(address),
             REGION_VRAM => read_u32(&*self.vram, vram_offset(address)),
             REGION_OAM => read_u32(&*self.oam, (address & OAM_MASK) as usize),

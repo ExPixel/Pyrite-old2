@@ -1,4 +1,5 @@
 mod audio;
+mod ioregs;
 mod performance;
 
 use egui::{Color32, Context, Visuals};
@@ -12,6 +13,7 @@ pub struct Debugger {
     current_pane: Pane,
     performance_pane: performance::PerformancePane,
     audio_pane: audio::AudioPane,
+    ioregs_pane: ioregs::IoRegistersPane,
 
     has_initialized: bool,
 
@@ -36,12 +38,14 @@ impl Debugger {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.current_pane, Pane::Performance, "Performance");
+                ui.selectable_value(&mut self.current_pane, Pane::IoRegisters, "IO Registers");
                 ui.selectable_value(&mut self.current_pane, Pane::Audio, "Audio");
             });
 
             match self.current_pane {
                 Pane::Performance => self.performance_pane.render(ui, &mut self.gba_data),
                 Pane::Audio => self.audio_pane.render(ui, &mut self.gba_data),
+                Pane::IoRegisters => self.ioregs_pane.render(ui, &mut self.gba_data),
             }
         });
     }
@@ -62,8 +66,9 @@ impl Debugger {
             let mut locked = gba_data_buffer.lock();
             pull_data_from_gba(&mut *locked, gba, state);
         });
-
         self.frame_callback = Some(callback_id);
+
+        self.ioregs_pane.init();
     }
 
     pub fn destroy(&mut self, gba: &GbaHandle) {
@@ -77,6 +82,7 @@ impl Debugger {
 enum Pane {
     Performance,
     Audio,
+    IoRegisters,
 }
 
 impl Default for Pane {
@@ -92,6 +98,8 @@ struct GbaData {
 
     audio_commands: Vec<Command>,
     has_audio_commands: bool,
+
+    ioreg: Option<u32>,
 
     updated: bool,
     requests: GbaDataRequests,
@@ -118,6 +126,8 @@ impl GbaData {
             self.has_audio_commands = false;
         }
 
+        self.ioreg = source.ioreg.take();
+
         source.requests = std::mem::take(&mut self.requests);
     }
 }
@@ -126,6 +136,7 @@ impl GbaData {
 struct GbaDataRequests {
     frame_duration: bool,
     audio_data: bool,
+    ioreg: Option<u32>,
 }
 
 fn pull_data_from_gba(data: &mut GbaData, gba: &mut Gba, state: &mut GbaThreadState) {
@@ -140,6 +151,10 @@ fn pull_data_from_gba(data: &mut GbaData, gba: &mut Gba, state: &mut GbaThreadSt
         data.has_audio_commands = true;
     } else {
         data.has_audio_commands = false;
+    }
+
+    if let Some(address) = data.requests.ioreg {
+        data.ioreg = Some(gba.memory_mut().view32(address));
     }
 
     data.updated = true;

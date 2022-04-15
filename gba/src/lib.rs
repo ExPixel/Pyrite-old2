@@ -182,6 +182,14 @@ impl Gba {
         !self.mem.ioregs.keyinput.is_bit_set(button as u16 as u32)
     }
 
+    pub fn memory(&self) -> &GbaMemory {
+        &self.mem
+    }
+
+    pub fn memory_mut(&mut self) -> &mut GbaMemory {
+        &mut self.mem
+    }
+
     pub fn video(&self) -> &GbaVideo {
         &self.video
     }

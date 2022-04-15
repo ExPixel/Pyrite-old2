@@ -58,8 +58,11 @@ pub fn flush(timer: &mut Timer, now: u64) {
     }
 
     // This should NEVER overflow before the overflow function is called by the scheduler, which should reset the timer's counter.
-    timer.counter += ((now - timer.origin) >> timer.control.prescaler_shift()) as u16;
-    timer.origin = now;
+    let delta = now - timer.origin;
+    if delta >= (1 << timer.control.prescaler_shift()) {
+        timer.counter += ((now - timer.origin) >> timer.control.prescaler_shift()) as u16;
+        timer.origin = now;
+    }
 }
 
 pub fn overflow<const TIMER: usize>(gba: &mut Gba) {

@@ -1,18 +1,17 @@
-use egui::{
-    plot::{Bar, BarChart, HLine, Line, Plot, Value, Values},
-    Color32, Context, Grid, Ui, Visuals,
-};
-use gba::{Command, Gba, GbaAudioSampler};
+mod audio;
+mod performance;
+
+use egui::{Color32, Context, Visuals};
+use gba::{Command, Gba};
 use parking_lot::Mutex;
 use pyrite::{CallbackId, GbaHandle, GbaThreadState};
 use std::{sync::Arc, time::Duration};
-use util::circular::CircularBuffer;
 
 #[derive(Default)]
 pub struct Debugger {
     current_pane: Pane,
-    performance_pane: PerformancePane,
-    audio_pane: AudioPane,
+    performance_pane: performance::PerformancePane,
+    audio_pane: audio::AudioPane,
 
     has_initialized: bool,
 
@@ -83,222 +82,6 @@ enum Pane {
 impl Default for Pane {
     fn default() -> Self {
         Self::Performance
-    }
-}
-
-struct AudioPane {
-    sampler: GbaAudioSampler,
-    samples_l: CircularBuffer<f32, { Self::BUFFER_SIZE }>,
-    samples_r: CircularBuffer<f32, { Self::BUFFER_SIZE }>,
-    commands_buffer_sizes: CircularBuffer<u32, { Self::FRAMES }>,
-}
-
-impl AudioPane {
-    const RENDER_SAMPLES: u32 = 1024;
-    const FRAMES: usize = 16;
-    const BUFFER_SIZE: usize = Self::FRAMES * Self::RENDER_SAMPLES as usize;
-
-    fn render(&mut self, ui: &mut Ui, data: &mut GbaData) {
-        self.get_data(data);
-        Grid::new("GBA Frame Durations Grid")
-            .num_columns(2)
-            .striped(true)
-            .show(ui, |ui| {
-                ui.label("Output");
-                self.render_samples_plot(ui);
-                ui.end_row();
-
-                ui.label("Commands");
-                self.render_commands_buffer_plot(ui);
-                ui.end_row();
-            });
-    }
-
-    fn render_commands_buffer_plot(&mut self, ui: &mut Ui) {
-        let mut bars = Vec::with_capacity(self.commands_buffer_sizes.len());
-        for (idx, &size) in self.commands_buffer_sizes.iter().enumerate() {
-            bars.push(Bar::new(idx as f64, size as f64));
-        }
-
-        let chart = BarChart::new(bars).name("Command Buffer Size Chart");
-        Plot::new("Command Buffer Sizes")
-            .allow_drag(false)
-            .allow_zoom(true)
-            .show(ui, |plot_ui| {
-                plot_ui.bar_chart(chart);
-            });
-    }
-
-    fn render_samples_plot(&mut self, ui: &mut Ui) {
-        let samples_l = self
-            .samples_l
-            .iter()
-            .enumerate()
-            .map(|(idx, &s)| Value::new(idx as f64, s));
-        let samples_r = self
-            .samples_r
-            .iter()
-            .enumerate()
-            .map(|(idx, &s)| Value::new(idx as f64, s));
-
-        let line_l = Line::new(Values::from_values_iter(samples_l)).color(rgb(0x228be6));
-        let line_r = Line::new(Values::from_values_iter(samples_r)).color(rgb(0xae3ec9));
-
-        Plot::new("Samples")
-            .show_axes([false, false])
-            .allow_drag(true)
-            .allow_zoom(true)
-            .include_y(1.0)
-            .include_y(-1.0)
-            .show(ui, |plot_ui| {
-                plot_ui.line(line_l);
-                plot_ui.line(line_r);
-            });
-    }
-
-    fn get_data(&mut self, data: &mut GbaData) {
-        if std::mem::take(&mut data.has_audio_commands) {
-            self.commands_buffer_sizes
-                .push(data.audio_commands.len() as u32);
-            for _ in 0..Self::RENDER_SAMPLES {
-                while self.sampler.needs_commands() {
-                    if let Some(command) = data.audio_commands.pop() {
-                        self.sampler.command(command);
-                    } else {
-                        break;
-                    }
-                }
-
-                let (l, r) = self.sampler.frame();
-                self.samples_l.push(l);
-                self.samples_r.push(r);
-            }
-        }
-        data.requests.audio_data = true;
-    }
-}
-
-impl Default for AudioPane {
-    fn default() -> Self {
-        AudioPane {
-            sampler: GbaAudioSampler::new(Self::RENDER_SAMPLES),
-            samples_l: Default::default(),
-            samples_r: Default::default(),
-            commands_buffer_sizes: Default::default(),
-        }
-    }
-}
-
-#[derive(Default)]
-struct PerformancePane {
-    frame_times: CircularBuffer<f64, 32>,
-    frame_processing_times: CircularBuffer<f64, 32>,
-}
-
-impl PerformancePane {
-    const GBA_MAX_FRAME_DUR: f64 = 1000.0 / 60.0;
-
-    const GOOD_FRAME_COLOR: Color32 = Color32::from_rgb(0x37, 0xb2, 0x4d);
-    const BAD_FRAME_COLOR: Color32 = Color32::from_rgb(0xf0, 0x3e, 0x3e);
-
-    fn render(&mut self, ui: &mut Ui, data: &mut GbaData) {
-        if let Some(duration) = data.frame_duration.take() {
-            self.frame_times.push(duration.as_secs_f64() * 1000.0);
-        }
-
-        if let Some(duration) = data.frame_processing_duration.take() {
-            self.frame_processing_times
-                .push(duration.as_secs_f64() * 1000.0);
-        }
-
-        self.render_frame_times(ui);
-        data.requests.frame_duration = true;
-    }
-
-    fn render_frame_times_text(&mut self, ui: &mut Ui) {
-        let average_dur =
-            self.frame_times.iter().copied().sum::<f64>() / self.frame_times.len() as f64;
-        ui.label("Average GBA Frame Duration");
-        ui.label(format!("{average_dur:0.2}ms"));
-        ui.end_row();
-
-        let average_fps = 1000.0 / average_dur;
-        ui.label("Average GBA FPS");
-        ui.label(format!("{average_fps:0.2}"));
-        ui.end_row();
-
-        let average_perf = (Self::GBA_MAX_FRAME_DUR / average_dur) * 100.0;
-        ui.label("Average GBA Performance");
-        ui.label(format!("{average_perf:0.2}%"));
-        ui.end_row();
-    }
-
-    fn render_processing_times_plot(&mut self, ui: &mut Ui) {
-        const PROCESSING_COLOR: Color32 = Color32::from_rgb(0x1c, 0x7e, 0xd6);
-        let mut bars = Vec::with_capacity(self.frame_processing_times.len());
-        for (idx, &t) in self.frame_processing_times.iter().skip(1).enumerate() {
-            bars.push(Bar::new(idx as f64, t).fill(PROCESSING_COLOR));
-        }
-
-        if !self.frame_processing_times.is_empty() {
-            bars.push(Bar::new(bars.len() as f64, 0.0));
-        }
-
-        let chart = BarChart::new(bars).name("GBA Frame Processing Duration");
-        Plot::new("GBA Processing Durations")
-            .show_x(false)
-            .show_axes([false, false])
-            .allow_drag(false)
-            .allow_zoom(false)
-            .include_y(Self::GBA_MAX_FRAME_DUR)
-            .show(ui, |plot_ui| {
-                plot_ui.bar_chart(chart);
-            });
-    }
-
-    fn render_frame_times_plot(&mut self, ui: &mut Ui) {
-        let bar_color = |t: f64| -> Color32 {
-            if t > 4.0 {
-                Self::BAD_FRAME_COLOR
-            } else {
-                Self::GOOD_FRAME_COLOR
-            }
-        };
-
-        let bars = self
-            .frame_times
-            .iter()
-            .enumerate()
-            .map(|(idx, &t)| Bar::new(idx as f64, t).fill(bar_color(t)))
-            .collect();
-        let chart = BarChart::new(bars).name("GBA Frame Processing Duration");
-        Plot::new("GBA Frame Durations")
-            .show_x(false)
-            .show_axes([false, false])
-            .allow_drag(false)
-            .allow_zoom(false)
-            .include_y(Self::GBA_MAX_FRAME_DUR)
-            .show(ui, |plot_ui| {
-                plot_ui.hline(HLine::new(4.0).color(Self::BAD_FRAME_COLOR));
-                plot_ui.bar_chart(chart);
-            });
-    }
-
-    fn render_frame_times(&mut self, ui: &mut Ui) {
-        Grid::new("GBA Frame Durations Grid")
-            .num_columns(2)
-            .striped(true)
-            .show(ui, |ui| {
-                self.render_frame_times_text(ui);
-
-                ui.label("GBA Frame Durations");
-                self.render_frame_times_plot(ui);
-                ui.end_row();
-
-                ui.label("GBA Processing Durations");
-                self.render_processing_times_plot(ui);
-                ui.end_row();
-            });
     }
 }
 

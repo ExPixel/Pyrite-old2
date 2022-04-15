@@ -24,37 +24,53 @@ impl GbaMemory {
             0xE000001 => DEVICE,
             _ => 0,
         };
-        log::warn!("attempted to load from  unimplemented SRAM; address=0x{address:08X}; value=0x{value:02X}");
+        unimplemented_sram_load();
         (value, self.sram_waitstates)
     }
 
     pub(super) fn store32_sram(
         &mut self,
-        address: u32,
-        value: u32,
+        _address: u32,
+        _value: u32,
         _access: AccessType,
     ) -> Waitstates {
-        log::warn!("attempted to store to unimplemented SRAM; address=0x{address:08X}; value=0x{value:08X}",);
+        unimplemented_sram_store();
         self.sram_waitstates
     }
 
     pub(super) fn store16_sram(
         &mut self,
-        address: u32,
-        value: u16,
+        _address: u32,
+        _value: u16,
         _access: AccessType,
     ) -> Waitstates {
-        log::warn!("attempted to store to unimplemented SRAM; address=0x{address:08X}; value=0x{value:04X}",);
+        unimplemented_sram_store();
         self.sram_waitstates
     }
 
     pub(super) fn store8_sram(
         &mut self,
-        address: u32,
-        value: u8,
+        _address: u32,
+        _value: u8,
         _access: AccessType,
     ) -> Waitstates {
-        log::warn!("attempted to store to unimplemented SRAM; address=0x{address:08X}; value=0x{value:02X}",);
+        unimplemented_sram_store();
         self.sram_waitstates
+    }
+}
+
+fn unimplemented_sram_load() {
+    static mut CALLED: bool = false;
+    if unsafe { !CALLED } {
+        unsafe { CALLED = true };
+        log::warn!("unimplemented SRAM load");
+    }
+}
+
+fn unimplemented_sram_store() {
+    static mut CALLED: bool = false;
+    if unsafe { !CALLED } {
+        unsafe { CALLED = true };
+        log::warn!("unimplemented SRAM store");
     }
 }

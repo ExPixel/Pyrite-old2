@@ -15,14 +15,14 @@ use util::{
 };
 
 impl GbaMemory {
-    pub(super) fn load32_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u32 {
-        let lo = self.load16_io::<SIDE_EFFECTS>(address) as u32;
-        let hi = self.load16_io::<SIDE_EFFECTS>(address + 2) as u32;
+    pub(super) fn load32_io<const VIEW: bool>(&mut self, address: u32) -> u32 {
+        let lo = self.load16_io::<VIEW>(address) as u32;
+        let hi = self.load16_io::<VIEW>(address + 2) as u32;
 
         lo | (hi << 16)
     }
 
-    pub(super) fn load16_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u16 {
+    pub(super) fn load16_io<const VIEW: bool>(&mut self, address: u32) -> u16 {
         macro_rules! unimplemented_register {
             ($name:expr) => {{
                 static mut ATTEMPTED_READ: bool = false;
@@ -169,9 +169,9 @@ impl GbaMemory {
         }
     }
 
-    pub(super) fn load8_io<const SIDE_EFFECTS: bool>(&mut self, address: u32) -> u8 {
+    pub(super) fn load8_io<const VIEW: bool>(&mut self, address: u32) -> u8 {
         let shift = (address & 1) * 8;
-        (self.load16_io::<SIDE_EFFECTS>(address & !0x1) >> shift) as u8
+        (self.load16_io::<VIEW>(address & !0x1) >> shift) as u8
     }
 
     pub(super) fn store32_io(&mut self, address: u32, value: u32) {

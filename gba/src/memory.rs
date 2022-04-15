@@ -134,7 +134,7 @@ impl GbaMemory {
             REGION_IWRAM => self.iwram[(address & IWRAM_MASK) as usize],
             REGION_IOREGS => {
                 if address < IOREGS_SIZE {
-                    self.load8_io::<false>(address)
+                    self.load8_io::<true>(address)
                 } else {
                     0
                 }
@@ -172,7 +172,7 @@ impl GbaMemory {
             REGION_IWRAM => read_u16(&*self.iwram, (address & IWRAM_MASK) as usize),
             REGION_IOREGS => {
                 if address < IOREGS_SIZE {
-                    self.load16_io::<false>(address)
+                    self.load16_io::<true>(address)
                 } else {
                     0
                 }
@@ -210,7 +210,7 @@ impl GbaMemory {
             REGION_IWRAM => read_u32(&*self.iwram, (address & IWRAM_MASK) as usize),
             REGION_IOREGS => {
                 if address < IOREGS_SIZE {
-                    self.load32_io::<false>(address)
+                    self.load32_io::<true>(address)
                 } else {
                     0
                 }
@@ -296,7 +296,7 @@ impl Memory for GbaMemory {
                 wait = self.ewram_waitstates + self.ewram_waitstates;
             }
             REGION_IWRAM => value = read_u32(&*self.iwram, (address & IWRAM_MASK) as usize),
-            REGION_IOREGS => value = self.load32_io::<true>(address),
+            REGION_IOREGS => value = self.load32_io::<false>(address),
             REGION_PAL => {
                 value = self.palette.load32(address);
                 wait += Waitstates::ONE;
@@ -338,7 +338,7 @@ impl Memory for GbaMemory {
                 wait = self.ewram_waitstates;
             }
             REGION_IWRAM => value = read_u16(&*self.iwram, (address & IWRAM_MASK) as usize),
-            REGION_IOREGS => value = self.load16_io::<true>(address),
+            REGION_IOREGS => value = self.load16_io::<false>(address),
             REGION_PAL => value = self.palette.load16(address),
             REGION_VRAM => value = read_u16(&*self.vram, vram_offset(address)),
             REGION_OAM => value = read_u16(&*self.oam, (address & OAM_MASK) as usize),
@@ -375,7 +375,7 @@ impl Memory for GbaMemory {
                 wait = self.ewram_waitstates;
             }
             REGION_IWRAM => value = self.iwram[(address & IWRAM_MASK) as usize],
-            REGION_IOREGS => value = self.load8_io::<true>(address),
+            REGION_IOREGS => value = self.load8_io::<false>(address),
             REGION_PAL => value = self.palette.load8(address),
             REGION_VRAM => value = self.vram[vram_offset(address)],
             REGION_OAM => value = self.oam[(address & OAM_MASK) as usize],

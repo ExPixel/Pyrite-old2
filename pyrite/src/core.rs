@@ -31,9 +31,25 @@ fn gba_thread_fn(rx: Receiver<GbaMessage>) {
         ctx.state.frame_duration = frame_start_time.elapsed();
         ctx.state.frame_count += 1;
 
-        ctx.on_frame
-            .iter_mut()
-            .for_each(|(_, cb)| (cb)(&mut ctx.gba, &mut ctx.state));
+        // FIXME replace this with retain_mut when that is stabilized in 1.61
+        //
+        // ctx.on_frame.retain_mut(|(_, cb)| {
+        //     ctx.state.remove_callback = false;
+        //     (cb)(&mut ctx.gba, &mut ctx.state);
+        //     !std::mem::take(&mut ctx.state.remove_callback)
+        // });
+        let mut idx = 0;
+        while idx < ctx.on_frame.len() {
+            let (_, ref mut cb) = ctx.on_frame[idx];
+            ctx.state.remove_callback = false;
+            (cb)(&mut ctx.gba, &mut ctx.state);
+            if std::mem::take(&mut ctx.state.remove_callback) {
+                let _ = ctx.on_frame.remove(idx);
+            } else {
+                idx += 1;
+            }
+        }
+
         empty_gba_message_queue(&mut ctx, &rx);
 
         if ctx.state.paused {
@@ -108,6 +124,9 @@ pub struct GbaThreadState {
 
     /// Duration including drawing the frame and running all of the callbacks.
     frame_processing_duration: Duration,
+
+    /// When set to true, the currently executing callback will be marked for deletion.
+    remove_callback: bool,
 }
 
 impl GbaThreadState {
@@ -132,6 +151,11 @@ impl GbaThreadState {
     /// and run all of the callbacks.
     pub fn frame_processing_duration(&self) -> Duration {
         self.frame_processing_duration
+    }
+
+    // Remove the current callback.
+    pub fn remove_callback(&mut self) {
+        self.remove_callback = true;
     }
 }
 

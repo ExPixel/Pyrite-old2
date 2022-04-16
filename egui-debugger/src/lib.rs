@@ -95,6 +95,7 @@ impl Default for Pane {
 struct GbaData {
     frame_duration: Option<Duration>,
     frame_processing_duration: Option<Duration>,
+    frame_count: Option<u64>,
 
     audio_commands: Vec<Command>,
     has_audio_commands: bool,
@@ -116,6 +117,7 @@ impl GbaData {
 
         self.frame_duration = source.frame_duration.take();
         self.frame_processing_duration = source.frame_processing_duration.take();
+        self.frame_count = source.frame_count.take();
 
         if self.requests.audio_data {
             self.audio_commands.clear();
@@ -134,15 +136,16 @@ impl GbaData {
 
 #[derive(Default)]
 struct GbaDataRequests {
-    frame_duration: bool,
+    performance: bool,
     audio_data: bool,
     ioreg: Option<u32>,
 }
 
 fn pull_data_from_gba(data: &mut GbaData, gba: &mut Gba, state: &mut GbaThreadState) {
-    if data.requests.frame_duration {
+    if data.requests.performance {
         data.frame_duration = Some(state.frame_duration());
         data.frame_processing_duration = Some(state.frame_processing_duration());
+        data.frame_count = Some(state.frame_count());
     }
 
     if data.requests.audio_data {

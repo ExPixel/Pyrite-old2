@@ -29,6 +29,7 @@ fn gba_thread_fn(rx: Receiver<GbaMessage>) {
 
         ctx.gba.frame();
         ctx.state.frame_duration = frame_start_time.elapsed();
+        ctx.state.frame_count += 1;
 
         ctx.on_frame
             .iter_mut()
@@ -101,6 +102,8 @@ pub struct GbaThreadState {
     stopped: bool,
     pub target_fps: f64,
 
+    frame_count: u64,
+
     frame_duration: Duration,
 
     /// Duration including drawing the frame and running all of the callbacks.
@@ -119,6 +122,10 @@ impl GbaThreadState {
     /// Returns the amount of time required to render the current frame.
     pub fn frame_duration(&self) -> Duration {
         self.frame_duration
+    }
+
+    pub fn frame_count(&self) -> u64 {
+        self.frame_count
     }
 
     /// Returns the amount of time required to render the previous frame

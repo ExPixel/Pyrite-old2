@@ -8,6 +8,7 @@ use crate::GbaData;
 
 #[derive(Default)]
 pub struct PerformancePane {
+    frame_count: u64,
     frame_times: CircularBuffer<f64, 32>,
     frame_processing_times: CircularBuffer<f64, 32>,
 }
@@ -28,11 +29,17 @@ impl PerformancePane {
                 .push(duration.as_secs_f64() * 1000.0);
         }
 
+        self.frame_count = data.frame_count.take().unwrap_or(self.frame_count);
+
         self.render_frame_times(ui);
-        data.requests.frame_duration = true;
+        data.requests.performance = true;
     }
 
     fn render_frame_times_text(&mut self, ui: &mut Ui) {
+        ui.label("Frame Count");
+        ui.label(self.frame_count.to_string());
+        ui.end_row();
+
         let average_dur =
             self.frame_times.iter().copied().sum::<f64>() / self.frame_times.len() as f64;
         ui.label("Average GBA Frame Duration");

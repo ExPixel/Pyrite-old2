@@ -4,6 +4,8 @@ mod gbaui;
 mod glutil;
 mod pyrite_window;
 
+use std::path::{Path, PathBuf};
+
 use anyhow::Context as _;
 use debuggerui::DebuggerWindow;
 use gbaui::GbaWindow;
@@ -178,8 +180,34 @@ fn run(event_loop: EventLoop<()>) -> anyhow::Result<()> {
             .unwrap_or_default(),
     );
 
+    let args = parse_args().context("error occurred while parsing arguments")?;
+
     let gba = pyrite::GbaHandle::new();
-    let rom = get_rom_from_args().context("error occurred retrieving ROM from args")?;
+
+    let mut skip_frames = args.skip_to_frame.unwrap_or(0);
+    let skipping_frames = skip_frames > 0;
+    if skip_frames > 0 {
+        gba.after_frame_wait(|_gba, state| {
+            state.target_fps = 10000.0;
+        });
+
+        gba.on_frame(move |gba, state| {
+            skip_frames -= 1;
+
+            let render_frame = skip_frames <= 1 || (state.frame_count() % 2 == 0);
+            gba.video_mut().set_skip_render(!render_frame);
+
+            if skip_frames == 0 {
+                state.target_fps = 60.0;
+                state.paused = args.pause_on_startup;
+                state.remove_callback();
+            }
+        });
+    }
+
+    let rom = std::fs::read(&args.rom)
+        .with_context(|| format!("failed to read ROM path `{}`", args.rom.display()))?;
+
     let bios = config.gba.bios_path.as_ref().and_then(|path| {
         match std::fs::read(&path)
             .with_context(|| format!("failed to read path {}", path.display()))
@@ -213,7 +241,10 @@ fn run(event_loop: EventLoop<()>) -> anyhow::Result<()> {
     };
     let mut windows = Windows::new(config, window, gba).context("error initializing windows")?;
 
-    windows.gba_handle.set_paused(false);
+    if skipping_frames || !args.pause_on_startup {
+        windows.gba_handle.set_paused(false);
+    }
+
     event_loop.run(move |event, el, control_flow| {
         if let Err(err) = on_event(&mut windows, event, el, control_flow) {
             log::error!("error occurred in event loop: {:?}", err);
@@ -230,11 +261,53 @@ fn main() -> anyhow::Result<()> {
     unreachable!("run should never return unless there is an error");
 }
 
-fn get_rom_from_args() -> anyhow::Result<Vec<u8>> {
-    let rom_path = std::env::args()
-        .nth(1)
-        .map(std::path::PathBuf::from)
-        .ok_or_else(|| anyhow::anyhow!("expected ROM path as first argument"))?;
-    std::fs::read(&rom_path)
-        .with_context(|| format!("failed to read ROM path `{}`", rom_path.display()))
+fn parse_args() -> anyhow::Result<Args> {
+    use clap::{Arg, Command};
+    use std::str::FromStr;
+
+    let rom_arg = Arg::new("ROM").takes_value(true).required(true).index(1);
+    let skip_to_frame_arg = Arg::new("skip-to-frame")
+        .short('F')
+        .takes_value(true)
+        .long("skip-to-frame")
+        .help("Skip to the given frame on startup.");
+    let pause_on_startup = Arg::new("pause-on-startup")
+        .short('P')
+        .takes_value(false)
+        .long("pause-on-startup")
+        .help("Pause the emulator on startup. If `skip to frame` is set, this will pause after skipping.");
+
+    let matches = Command::new("pyrite")
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .arg(rom_arg)
+        .arg(skip_to_frame_arg)
+        .arg(pause_on_startup)
+        .get_matches();
+
+    let rom: PathBuf = if let Some(rom_path) = matches.value_of("ROM") {
+        Path::new(rom_path).into()
+    } else {
+        unreachable!("no ROM path provided");
+    };
+
+    let skip_to_frame = matches
+        .value_of("skip-to-frame")
+        .map(u32::from_str)
+        .transpose()
+        .context("skip-to-frame must be a valid integer")?;
+    let pause_on_startup = matches.is_present("pause-on-startup");
+
+    Ok(Args {
+        rom,
+        skip_to_frame,
+        pause_on_startup,
+    })
+}
+
+struct Args {
+    rom: PathBuf,
+    skip_to_frame: Option<u32>,
+    pause_on_startup: bool,
 }

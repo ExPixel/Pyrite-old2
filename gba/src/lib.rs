@@ -194,6 +194,10 @@ impl Gba {
         &self.video
     }
 
+    pub fn video_mut(&mut self) -> &mut GbaVideo {
+        &mut self.video
+    }
+
     pub fn audio(&self) -> &GbaAudio {
         &self.audio
     }

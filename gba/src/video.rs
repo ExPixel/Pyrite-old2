@@ -30,12 +30,17 @@ const HBLANK_CYCLES: Cycles = Cycles::new(272);
 pub struct GbaVideo {
     scheduler: Scheduler,
     pub(crate) screen: [u16; SCREEN_PIXEL_COUNT],
+    skip_render: bool,
 }
 
 impl GbaVideo {
     pub fn new(scheduler: Scheduler) -> Self {
         let screen = [0u16; SCREEN_PIXEL_COUNT];
-        GbaVideo { scheduler, screen }
+        GbaVideo {
+            scheduler,
+            screen,
+            skip_render: false,
+        }
     }
 
     pub(crate) fn init(&mut self, mem: &mut GbaMemory) {
@@ -98,7 +103,10 @@ impl GbaVideo {
             let output_buf_start = line as usize * 240;
             let output_buf_end = output_buf_start + 240;
             let output_buf = &mut self.screen[output_buf_start..output_buf_end];
-            Self::render_line(line, output_buf, mem);
+
+            if !self.skip_render {
+                Self::render_line(line, output_buf, mem);
+            }
         }
 
         if line < 160 {
@@ -141,5 +149,9 @@ impl GbaVideo {
 
     pub fn screen(&self) -> &[u16; SCREEN_PIXEL_COUNT] {
         &self.screen
+    }
+
+    pub fn set_skip_render(&mut self, skip: bool) {
+        self.skip_render = skip;
     }
 }

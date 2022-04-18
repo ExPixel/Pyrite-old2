@@ -194,13 +194,18 @@ fn run(event_loop: EventLoop<()>) -> anyhow::Result<()> {
         gba.on_frame(move |gba, state| {
             skip_frames -= 1;
 
-            let render_frame = skip_frames <= 1 || (state.frame_count() % 2 == 0);
+            let render_frame =
+                args.profiling || (skip_frames <= 1 || (state.frame_count() % 2 == 0));
             gba.video_mut().set_skip_render(!render_frame);
 
             if skip_frames == 0 {
                 state.target_fps = 60.0;
                 state.paused = args.pause_on_startup;
                 state.remove_callback();
+
+                if args.exit_after_skip {
+                    std::process::exit(0);
+                }
             }
         });
     }
@@ -271,11 +276,16 @@ fn parse_args() -> anyhow::Result<Args> {
         .takes_value(true)
         .long("skip-to-frame")
         .help("Skip to the given frame on startup.");
-    let pause_on_startup = Arg::new("pause-on-startup")
+    let pause_on_startup_arg = Arg::new("pause-on-startup")
         .short('P')
-        .takes_value(false)
         .long("pause-on-startup")
         .help("Pause the emulator on startup. If `skip to frame` is set, this will pause after skipping.");
+    let exit_after_skip_arg = Arg::new("exit-after-skip")
+        .long("exit-after-skip")
+        .help("Causes the emulator to exit afer skipping frames if `skip-to-frame` was specified.");
+    let profiling_arg = Arg::new("profiling")
+        .long("profiling")
+        .help("Enable this if profiling. This will stop the emulator from skipping frames.");
 
     let matches = Command::new("pyrite")
         .version(env!("CARGO_PKG_VERSION"))
@@ -283,7 +293,9 @@ fn parse_args() -> anyhow::Result<Args> {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(rom_arg)
         .arg(skip_to_frame_arg)
-        .arg(pause_on_startup)
+        .arg(pause_on_startup_arg)
+        .arg(exit_after_skip_arg)
+        .arg(profiling_arg)
         .get_matches();
 
     let rom: PathBuf = if let Some(rom_path) = matches.value_of("ROM") {
@@ -298,11 +310,15 @@ fn parse_args() -> anyhow::Result<Args> {
         .transpose()
         .context("skip-to-frame must be a valid integer")?;
     let pause_on_startup = matches.is_present("pause-on-startup");
+    let exit_after_skip = matches.is_present("exit-after-skip");
+    let profiling = matches.is_present("profiling");
 
     Ok(Args {
         rom,
         skip_to_frame,
         pause_on_startup,
+        exit_after_skip,
+        profiling,
     })
 }
 
@@ -310,4 +326,6 @@ struct Args {
     rom: PathBuf,
     skip_to_frame: Option<u32>,
     pause_on_startup: bool,
+    exit_after_skip: bool,
+    profiling: bool,
 }

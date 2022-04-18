@@ -5,12 +5,15 @@ use cpal::{
 };
 use crossbeam::queue::SegQueue;
 use gba::{Command, GbaAudioSampler};
+use glutin::event_loop::EventLoopProxy;
 use pyrite::GbaHandle;
 use std::sync::Arc;
 
+use crate::PyriteEvent;
+
 const COMMANDS_CHUNK_SIZE: usize = 64;
 
-pub fn run(gba: GbaHandle) -> anyhow::Result<Stream> {
+pub(crate) fn run(gba: GbaHandle, proxy: EventLoopProxy<PyriteEvent>) -> anyhow::Result<Stream> {
     let host = cpal::default_host();
     let device = host
         .default_output_device()
@@ -57,6 +60,13 @@ pub fn run(gba: GbaHandle) -> anyhow::Result<Stream> {
                     commands_buffer_queue.push(chunk);
                     last_chunk_count += 1;
                 });
+        }
+    });
+
+    gba.on_pause_changed(move |_, state| {
+        if let Err(err) = proxy.send_event(PyriteEvent::SetAudioPaused(state.paused)) {
+            log::error!("error occurred while sending pause pyrite event: {err}");
+            state.remove_callback();
         }
     });
     Ok(stream)

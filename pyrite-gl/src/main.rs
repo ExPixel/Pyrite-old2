@@ -78,7 +78,10 @@ impl Windows {
         }
     }
 
-    fn create_debugger_window(&mut self, el: &EventLoopWindowTarget<()>) -> anyhow::Result<()> {
+    fn create_debugger_window(
+        &mut self,
+        el: &EventLoopWindowTarget<PyriteEvent>,
+    ) -> anyhow::Result<()> {
         if self.debugger.is_some() {
             return Ok(());
         }
@@ -110,7 +113,7 @@ impl Windows {
 
 fn on_window_event(
     event: WindowEvent,
-    el: &EventLoopWindowTarget<()>,
+    el: &EventLoopWindowTarget<PyriteEvent>,
     id: WindowId,
     windows: &mut Windows,
     flow: &mut ControlFlow,
@@ -151,10 +154,13 @@ fn on_window_event(
 
 fn on_event(
     windows: &mut Windows,
-    event: Event<()>,
-    el: &EventLoopWindowTarget<()>,
+    audio: &mut cpal::Stream,
+    event: Event<PyriteEvent>,
+    el: &EventLoopWindowTarget<PyriteEvent>,
     flow: &mut ControlFlow,
 ) -> anyhow::Result<()> {
+    use cpal::traits::StreamTrait as _;
+
     *flow = ControlFlow::Wait;
 
     match event {
@@ -165,12 +171,22 @@ fn on_event(
             windows.with_window(window_id, |window| window.gl_render(flow));
         }
         Event::MainEventsCleared => windows.main_events_cleared(),
+        Event::UserEvent(PyriteEvent::SetAudioPaused(paused)) => {
+            if paused {
+                // FIXME Not all audio devices support this! Fallback to a different strategy of
+                //       sending something to the audio thread if this fails.
+                audio.pause().context("failed to pause audio stream")?;
+            } else {
+                audio.play().context("failed to play audio stream")?;
+            }
+        }
         _ => *flow = ControlFlow::Poll,
     }
+
     Ok(())
 }
 
-fn run(event_loop: EventLoop<()>) -> anyhow::Result<()> {
+fn run(event_loop: EventLoop<PyriteEvent>) -> anyhow::Result<()> {
     let config = std::sync::Arc::new(
         pyrite::config::from_toml_path("pyrite.toml")
             .map_err(|err| {
@@ -230,7 +246,8 @@ fn run(event_loop: EventLoop<()>) -> anyhow::Result<()> {
         gba.set_bios(bios);
         gba.reset(boot_from_bios);
     });
-    let _stream = audio::run(gba.clone()).context("error while starting audio")?;
+    let mut stream =
+        audio::run(gba.clone(), event_loop.create_proxy()).context("error while starting audio")?;
 
     let window = WindowBuilder::new()
         .with_title("Pyrite")
@@ -251,7 +268,7 @@ fn run(event_loop: EventLoop<()>) -> anyhow::Result<()> {
     }
 
     event_loop.run(move |event, el, control_flow| {
-        if let Err(err) = on_event(&mut windows, event, el, control_flow) {
+        if let Err(err) = on_event(&mut windows, &mut stream, event, el, control_flow) {
             log::error!("error occurred in event loop: {:?}", err);
             *control_flow = ControlFlow::Exit;
         }
@@ -260,7 +277,7 @@ fn run(event_loop: EventLoop<()>) -> anyhow::Result<()> {
 
 fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::with_user_event();
 
     run(event_loop).context("error occurred while running main loop")?;
     unreachable!("run should never return unless there is an error");
@@ -328,4 +345,8 @@ struct Args {
     pause_on_startup: bool,
     exit_after_skip: bool,
     profiling: bool,
+}
+
+pub(crate) enum PyriteEvent {
+    SetAudioPaused(bool),
 }

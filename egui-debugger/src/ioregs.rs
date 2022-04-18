@@ -18,17 +18,23 @@ impl IoRegistersPane {
             self.value = Some(value);
         }
 
+        let mut request_new_reg = false;
         ComboBox::from_label("IO Register")
             .selected_text(&self.ioreg_display[&self.register])
             .show_ui(ui, |ui| {
                 for &register in IoRegisters::ALL {
-                    ui.selectable_value(
+                    let response = ui.selectable_value(
                         &mut self.register,
                         register,
                         &self.ioreg_display[&register],
                     );
+                    request_new_reg |= response.changed();
                 }
             });
+
+        if request_new_reg {
+            self.value = None;
+        }
 
         if let Some(value) = self.value {
             let render_reg = self.register.render_function();
@@ -100,6 +106,11 @@ macro_rules! io_registers {
 io_registers! {
     [io::DISPCNT, 2, Dispcnt, "DISPCNT", "LCD Control", render_dispcnt],
     [io::DISPSTAT, 2, Dispstat, "DISPSTAT", "LCD Status", render_dispstat],
+    [io::VCOUNT, 2, Vcount, "VCOUNT", "Vertical Counter", render_u16],
+    [io::BG0CNT, 2, Bg0cnt, "BG0CNT", "BG0 Control", render_bgcnt],
+    [io::BG1CNT, 2, Bg1cnt, "BG1CNT", "BG1 Control", render_bgcnt],
+    [io::BG2CNT, 2, Bg2cnt, "BG2CNT", "BG2 Control", render_bgcnt],
+    [io::BG3CNT, 2, Bg3cnt, "BG3CNT", "BG3 Control", render_bgcnt],
 }
 
 impl Default for IoRegisters {
@@ -230,6 +241,54 @@ fn render_dispstat(value: u32, ui: &mut Ui) {
 
         ui.label("V-Counter Setting");
         ui.label(dispstat.vcount_setting().to_string());
+        ui.end_row();
+    });
+}
+
+fn render_bgcnt(value: u32, ui: &mut Ui) {
+    use gba::memory::io::BgControl;
+
+    let value = value as u16;
+    let bgcnt = BgControl::new(value);
+
+    Grid::new("BGCNT values").show(ui, |ui| {
+        ui.label("Value");
+        ui.label(format!("{value:04X}"));
+        ui.end_row();
+
+        ui.label("Priority");
+        ui.label(bgcnt.priority().to_string());
+        ui.end_row();
+
+        ui.label("Character Base");
+        ui.label(format!("+0x{:04X}", bgcnt.character_base()));
+        ui.end_row();
+
+        ui.label("Mosaic");
+        ui.label(enabled(bgcnt.mosaic()));
+        ui.end_row();
+
+        ui.label("Palettes");
+        ui.label(if bgcnt.palette_256() {
+            "256/1"
+        } else {
+            "16/16"
+        });
+        ui.end_row();
+
+        ui.label("Screen Base");
+        ui.label(format!("+0x{:04X}", bgcnt.screen_base()));
+        ui.end_row();
+
+        let size = bgcnt.screen_size();
+        ui.label("Screen Size");
+        ui.label(format!(
+            "{}x{} / {}x{} (rotscale)",
+            size.width(false),
+            size.height(false),
+            size.width(true),
+            size.height(false)
+        ));
         ui.end_row();
     });
 }

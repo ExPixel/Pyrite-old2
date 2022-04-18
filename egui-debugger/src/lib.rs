@@ -138,7 +138,7 @@ impl GbaData {
 struct GbaDataRequests {
     performance: bool,
     audio_data: bool,
-    ioreg: Option<u32>,
+    ioreg: Option<(/* addr */ u32, /* width */ u8)>,
 }
 
 fn pull_data_from_gba(data: &mut GbaData, gba: &mut Gba, state: &mut GbaThreadState) {
@@ -156,8 +156,13 @@ fn pull_data_from_gba(data: &mut GbaData, gba: &mut Gba, state: &mut GbaThreadSt
         data.has_audio_commands = false;
     }
 
-    if let Some(address) = data.requests.ioreg {
-        data.ioreg = Some(gba.memory_mut().view32(address));
+    if let Some((address, width)) = data.requests.ioreg {
+        match width {
+            1 => data.ioreg = Some(gba.memory_mut().view8(address) as u32),
+            2 => data.ioreg = Some(gba.memory_mut().view16(address) as u32),
+            4 => data.ioreg = Some(gba.memory_mut().view32(address)),
+            _ => unreachable!(),
+        }
     }
 
     data.updated = true;

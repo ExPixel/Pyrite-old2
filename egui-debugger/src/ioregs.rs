@@ -41,11 +41,11 @@ impl IoRegistersPane {
             (render_reg)(value, ui);
 
             if self.track_value {
-                data.requests.ioreg = Some(self.register.address());
+                data.requests.ioreg = Some((self.register.address(), self.register.width()));
             }
         } else {
             ui.label("Waiting for value...");
-            data.requests.ioreg = Some(self.register.address());
+            data.requests.ioreg = Some((self.register.address(), self.register.width()));
         }
     }
 
@@ -97,6 +97,12 @@ macro_rules! io_registers {
             fn render_function(&self) -> fn(u32, &mut Ui) {
                 match self {
                     $( Self::$EnumName => $RenderFn ),+
+                }
+            }
+
+            fn width(&self) -> u8 {
+                match self {
+                    $( Self::$EnumName => $Width ),+
                 }
             }
         }

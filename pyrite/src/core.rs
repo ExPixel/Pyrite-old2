@@ -10,7 +10,7 @@ use crossbeam::{
 };
 use gba::Gba;
 
-type GbaThreadCallback = Box<dyn 'static + Send + FnMut(&mut Gba, &mut GbaThreadState)>;
+type GbaThreadCallback = Box<dyn 'static + Send + FnMut(&mut Gba, &mut GbaThreadState, GbaEvent)>;
 type GbaThreadCallbackOnce = Box<dyn 'static + Send + FnOnce(&mut Gba, &mut GbaThreadState)>;
 
 fn gba_thread_fn(rx: Receiver<GbaMessage>) {
@@ -31,36 +31,21 @@ fn gba_thread_fn(rx: Receiver<GbaMessage>) {
         ctx.state.frame_duration = frame_start_time.elapsed();
         ctx.state.frame_count += 1;
 
-        // FIXME replace this with retain_mut when that is stabilized in 1.61
-        //
-        // ctx.on_frame.retain_mut(|(_, cb)| {
-        //     ctx.state.remove_callback = false;
-        //     (cb)(&mut ctx.gba, &mut ctx.state);
-        //     !std::mem::take(&mut ctx.state.remove_callback)
-        // });
-        let mut idx = 0;
-        while idx < ctx.on_frame.len() {
-            let (_, ref mut cb) = ctx.on_frame[idx];
-            ctx.state.remove_callback = false;
-            (cb)(&mut ctx.gba, &mut ctx.state);
-            if std::mem::take(&mut ctx.state.remove_callback) {
-                let _ = ctx.on_frame.remove(idx);
-            } else {
-                idx += 1;
-            }
-        }
+        ctx.on_event(GbaEvent::FRAME_READY);
 
         empty_gba_message_queue(&mut ctx, &rx);
 
         if ctx.state.paused {
+            ctx.on_event(GbaEvent::PAUSED);
             wait_for_gba_unpause(&mut ctx, &rx);
-        } else {
-            let frame_duration = frame_start_time.elapsed();
-            ctx.state.frame_processing_duration = frame_duration;
-            let target_frame_duration = Duration::from_secs_f64(1.0 / ctx.state.target_fps);
-            if frame_duration < target_frame_duration {
-                spin_sleeper.sleep(target_frame_duration - frame_duration);
-            }
+            ctx.on_event(GbaEvent::UNPAUSED);
+        }
+
+        let frame_duration = frame_start_time.elapsed();
+        ctx.state.frame_processing_duration = frame_duration;
+        let target_frame_duration = Duration::from_secs_f64(1.0 / ctx.state.target_fps);
+        if frame_duration < target_frame_duration {
+            spin_sleeper.sleep(target_frame_duration - frame_duration);
         }
     }
     log::trace!("exited GBA thread loop");
@@ -99,9 +84,9 @@ fn process_gba_message(ctx: &mut Context, msg: GbaMessage) {
             log::trace!("GBA thread shutdown requested");
             ctx.state.stopped = true;
         }
-        GbaMessage::CallbackAfterFrame(cb) => (cb)(&mut ctx.gba, &mut ctx.state),
-        GbaMessage::CallbackOnFrame(id, cb) => ctx.on_frame.push((id, cb)),
-        GbaMessage::RemoveOnFrameCallback(rm_id) => ctx.on_frame.retain(|&(id, _)| id != rm_id),
+        GbaMessage::WithGba(cb) => (cb)(&mut ctx.gba, &mut ctx.state),
+        GbaMessage::Listen(id, cb, e) => ctx.on_event.push((id, cb, e)),
+        GbaMessage::RemoveOnFrameCallback(rm_id) => ctx.on_event.retain(|&(id, ..)| id != rm_id),
     }
 }
 
@@ -109,7 +94,26 @@ fn process_gba_message(ctx: &mut Context, msg: GbaMessage) {
 struct Context {
     gba: Gba,
     state: GbaThreadState,
-    on_frame: Vec<(CallbackId, GbaThreadCallback)>,
+
+    on_event: Vec<(CallbackId, GbaThreadCallback, GbaEvent)>,
+}
+
+impl Context {
+    fn on_event(&mut self, event: GbaEvent) {
+        let mut idx = 0;
+        while idx < self.on_event.len() {
+            let (_, ref mut cb, mask) = self.on_event[idx];
+            if mask.contains(event) {
+                self.state.remove_callback = false;
+                (cb)(&mut self.gba, &mut self.state, event);
+                if std::mem::take(&mut self.state.remove_callback) {
+                    let _ = self.on_event.remove(idx);
+                    continue;
+                }
+            }
+            idx += 1;
+        }
+    }
 }
 
 #[derive(Default)]
@@ -177,21 +181,43 @@ impl GbaHandle {
         let _ = self.tx.send(GbaMessage::Shutdown);
     }
 
-    pub fn on_frame<F>(&self, cb: F) -> CallbackId
-    where
-        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
-    {
+    fn on_events_internal(&self, events: GbaEvent, cb: GbaThreadCallback) -> CallbackId {
         let id = CallbackId::next_id();
-        if self
-            .tx
-            .send(GbaMessage::CallbackOnFrame(id, Box::new(cb)))
-            .is_err()
-        {
-            log::warn!("called `on_frame` on disconnected GBA handle");
+        let result = self.tx.send(GbaMessage::Listen(id, cb, events));
+        if result.is_err() {
+            log::warn!("called `on_events` on disconnected GBA handle");
             CallbackId(0)
         } else {
             id
         }
+    }
+
+    pub fn on_events<F>(&self, events: GbaEvent, cb: F) -> CallbackId
+    where
+        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState, GbaEvent),
+    {
+        self.on_events_internal(events, Box::new(cb))
+    }
+
+    fn on_event_discard<F>(&self, event: GbaEvent, mut cb: F) -> CallbackId
+    where
+        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
+    {
+        self.on_events(event, move |gba, state, _| (cb)(gba, state))
+    }
+
+    pub fn on_frame<F>(&self, cb: F) -> CallbackId
+    where
+        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
+    {
+        self.on_event_discard(GbaEvent::FRAME_READY, cb)
+    }
+
+    pub fn on_pause_changed<F>(&self, cb: F) -> CallbackId
+    where
+        F: 'static + Send + FnMut(&mut Gba, &mut GbaThreadState),
+    {
+        self.on_event_discard(GbaEvent::PAUSED | GbaEvent::UNPAUSED, cb)
     }
 
     pub fn remove_on_frame(&self, id: CallbackId) {
@@ -204,11 +230,7 @@ impl GbaHandle {
     where
         F: 'static + Send + FnOnce(&mut Gba, &mut GbaThreadState),
     {
-        if self
-            .tx
-            .send(GbaMessage::CallbackAfterFrame(Box::new(cb)))
-            .is_err()
-        {
+        if self.tx.send(GbaMessage::WithGba(Box::new(cb))).is_err() {
             log::warn!("called `after_frame` on disconnected GBA handle")
         }
     }
@@ -224,7 +246,7 @@ impl GbaHandle {
         let parker = parker.as_mut().unwrap();
         let unparker = parker.unparker().clone();
 
-        let msg = GbaMessage::CallbackAfterFrame(Box::new(move |gba, state| {
+        let msg = GbaMessage::WithGba(Box::new(move |gba, state| {
             (cb)(gba, state);
             unparker.unpark();
         }));
@@ -257,8 +279,8 @@ impl Default for GbaHandle {
 }
 
 enum GbaMessage {
-    CallbackAfterFrame(GbaThreadCallbackOnce),
-    CallbackOnFrame(CallbackId, GbaThreadCallback),
+    WithGba(GbaThreadCallbackOnce),
+    Listen(CallbackId, GbaThreadCallback, GbaEvent),
     RemoveOnFrameCallback(CallbackId),
     Shutdown,
 }
@@ -271,5 +293,13 @@ impl CallbackId {
         static NEXT_CALLBACK_ID: AtomicU64 = AtomicU64::new(1);
         let id = NEXT_CALLBACK_ID.fetch_add(1, Ordering::Relaxed);
         CallbackId(id)
+    }
+}
+
+bitflags::bitflags! {
+    pub struct GbaEvent: u32 {
+        const FRAME_READY = 0x1;
+        const PAUSED = 0x2;
+        const UNPAUSED = 0x04;
     }
 }

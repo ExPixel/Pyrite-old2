@@ -10,6 +10,7 @@ gba = { path = "../gba" }
 log = "0.4"
 spin_sleep = "1.1.0"
 toml = "0.5"
+bitflags = "1"
 
 [dependencies.serde]
 version = "1"

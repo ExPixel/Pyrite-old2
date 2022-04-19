@@ -388,7 +388,7 @@ impl ScreenSize {
         //   3      512        1024
 
         if !rotscale {
-            ((self.0 as u32 + 1) << 1) * 256
+            256 << (self.0 & 1)
         } else {
             128 << (self.0 as u32)
         }
